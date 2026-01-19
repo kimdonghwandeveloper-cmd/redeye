@@ -1,6 +1,6 @@
 
 import os
-import time
+import asyncio
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Railway 환경과 로컬 개발 환경을 동시에 지원하는 설정
-ZAP_URL = os.getenv("ZAP_URL", "http://localhost:8080")
+ZAP_URL = os.getenv("ZAP_URL", "http://zap-service.railway.internal:8080")
 ZAP_API_KEY = os.getenv("ZAP_API_KEY", "redeye1234")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -40,42 +40,67 @@ class ScanResult(BaseModel):
     alerts_count: int
     ai_analysis: str
 
-# --- System Prompt (위에서 정의한 내용) ---
+# --- System Prompt ---
 SYSTEM_PROMPT = """
-# Role Definition
-당신은 "RedEye" 프로젝트의 수석 보안 엔지니어이자 CTO입니다.
-당신은 현재 Railway 클라우드 환경에 배포된 FastAPI 서버 내부에서 동작하고 있습니다.
+# Role Definition (역할 정의)
+당신은 "RedEye" 프로젝트의 **수석 보안 엔지니어**이자 **CTO**입니다.
+당신은 현재 **Railway 클라우드 환경**에 배포된 **FastAPI 서버** 내부에서 동작하고 있습니다.
 
-# Infrastructure Context
-- Backend: FastAPI + Docker
-- Scanner: OWASP ZAP (Separate Container via Private Networking)
-- Address: ZAP_URL env var used.
+# Infrastructure Context (중요: 인프라 환경 인지)
+우리의 서비스 아키텍처는 **Railway** 위에서 두 개의 독립된 마이크로서비스로 구동됩니다.
+1. **Backend (This Service)**: FastAPI + LangChain + Docker (현재 당신이 실행 중인 곳).
+2. **Scanner Engine (OWASP ZAP)**: 별도의 Docker 컨테이너로 실행됨.
+   - **통신 방식**: Railway Private Networking을 사용합니다.
+   - **주소**: `localhost`가 아닙니다. 환경 변수 `ZAP_URL` (예: `http://zap-service.railway.internal:8080`)을 통해 접속합니다.
+   - **인증**: `ZAP_API_KEY` 환경 변수를 사용합니다.
 
-(나머지 프롬프트 내용은 위와 동일하다고 가정하고 생략 - 실제로는 꽉 채워야 함)
+# Your Goal (목표)
+OWASP ZAP 스캐너가 탐지한 취약점 로그를 분석하여, 개발자가 즉시 적용 가능한 **수정 코드(Patch)**와 **비즈니스 인사이트**를 제공하십시오.
+
+# Persona & Tone (페르소나)
+- **전문적이고 냉철함**: 스캐너의 결과를 맹신하지 말고 검증하십시오.
+- **인프라 인식(Awareness)**: 문제 해결책 제안 시, 우리가 Docker/Railway 환경임을 고려하십시오. (예: "파일 시스템에 직접 로그를 남기지 말고 STDOUT을 쓰세요.")
+- **공동 창업자 마인드**: 치명적인 보안 위협은 강력하게 경고하고, 오탐(False Positive)은 과감하게 무시하라고 조언하십시오.
+
+# Output Format (Markdown)
+
+## 🚨 [위험도: High/Medium/Low] <취약점 타이틀>
+
+**요약 (Executive Summary):**
+(개발자가 한눈에 알 수 있는 1문장 요약)
+
+**비즈니스 임팩트 (Why it matters):**
+(구체적인 해킹 시나리오 및 피해 예상)
+
+**기술적 분석 (Technical Analysis):**
+(로그 데이터 기반의 기술적 원인 분석)
+
+# ❌ 취약한 코드
 ...
-OWASP ZAP 로그를 분석하고 개발자에게 수정 코드를 제안하십시오.
+# ✅ 보안 패치 코드 (FastAPI/Python 권장)
+...
 """
 
 # --- Helper Functions ---
-def run_zap_scan(target_url: str):
+async def run_zap_scan(target_url: str):
     print(f"🚀 [ZAP] Scanning target: {target_url} via {ZAP_URL}")
     
     # 1. Spidering (크롤링)
     scan_id = zap.spider.scan(target_url)
     while int(zap.spider.status(scan_id)) < 100:
-        time.sleep(2)
+        await asyncio.sleep(2)
     print("✅ [ZAP] Spidering complete.")
 
     # 2. Active Scan (실제 공격 - 필요시 주석 해제, 시간이 오래 걸림)
     # scan_id = zap.ascan.scan(target_url)
     # while int(zap.ascan.status(scan_id)) < 100:
-    #    time.sleep(5)
+    #    await asyncio.sleep(5)
     
     # 3. 결과 수집
     alerts = zap.core.alerts(baseurl=target_url)
     return alerts
 
-def analyze_with_ai(alerts: List[dict]) -> str:
+async def analyze_with_ai(alerts: List[dict]) -> str:
     if not alerts:
         return "보안 취약점이 발견되지 않았습니다. (시스템이 매우 안전하거나, 스캔이 제대로 동작하지 않았습니다.)"
 
@@ -95,7 +120,7 @@ def analyze_with_ai(alerts: List[dict]) -> str:
         HumanMessage(content=user_message)
     ]
     
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     return response.content
 
 # --- Endpoints ---
@@ -104,17 +129,17 @@ def health_check():
     return {"status": "ok", "infra": "Railway Ready", "zap_url": ZAP_URL}
 
 @app.post("/scan", response_model=ScanResult)
-def start_scan(request: ScanRequest):
+async def start_scan(request: ScanRequest):
     """
     URL을 받아서 ZAP 스캔을 돌리고 -> AI 분석 결과를 반환
     (오래 걸리므로 실제 프로덕션에서는 비동기 큐(Celery/Redis) 권장)
     """
     try:
         # 1. ZAP 스캔 수행
-        raw_alerts = run_zap_scan(request.target_url)
+        raw_alerts = await run_zap_scan(request.target_url)
         
         # 2. AI 분석 수행
-        analysis_report = analyze_with_ai(raw_alerts)
+        analysis_report = await analyze_with_ai(raw_alerts)
         
         return {
             "target": request.target_url,
