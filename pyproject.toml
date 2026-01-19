@@ -1,0 +1,27 @@
+[project]
+name = "redeye"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "karl3408", email = "karl34408@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.128.0",
+    "langchain>=1.2.6",
+    "langchain-community>=0.4.1",
+    "langchain-openai>=1.1.7",
+    "pydantic>=2.12.5",
+    "pymongo>=4.16.0",
+    "python-dotenv>=1.2.1",
+    "python-owasp-zap-v2-4>=0.1.0",
+    "uvicorn>=0.40.0",
+]
+
+[project.scripts]
+redeye = "redeye:main"
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
