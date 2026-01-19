@@ -26,8 +26,8 @@ zap = ZAPv2(apikey=ZAP_API_KEY, proxies={'http': ZAP_URL, 'https': ZAP_URL})
 
 # 4. AI 모델 설정 (GPT-4o or 3.5-turbo)
 llm = ChatOpenAI(
-    model="gpt-4o", 
-    temperature=0.3, # 보안 분석은 창의성보다 정확성이 중요
+    model="gpt-4o-mini", 
+    temperature=0.3, # 가성비 모델 사용 (gpt-4o-mini)
     openai_api_key=OPENAI_API_KEY
 )
 
