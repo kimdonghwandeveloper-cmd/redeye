@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Frontend / Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+.DS_Store

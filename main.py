@@ -98,7 +98,15 @@ OWASP ZAP 스캐너가 탐지한 취약점 로그를 분석하여, 개발자가 
 async def run_zap_scan(target_url: str):
     print(f"🚀 [ZAP] Scanning target: {target_url} via {ZAP_URL}")
     
-    # 1. Spidering (크롤링)
+    # 1. Spidering (크롤링) - 깊이 제한 추가
+    # maxChildren=10, recurse=True, contextName=None, subtreeOnly=False
+    # zap.spider.scan(target_url, maxchoices=10, maxdepth=2) 처럼 설정 필요하나
+    # python-owasp-zap-v2 라이브러리 버전에 따라 파라미터가 다를 수 있음.
+    # 안전하게 기본 스캔 후 시간 대기로 제한하거나, 아예 설정을 먼저 보냄.
+    
+    # 설정: 최대 깊이 2로 제한 (빠른 스캔)
+    zap.spider.set_option_max_depth(2)
+    
     scan_id = zap.spider.scan(target_url)
     while int(zap.spider.status(scan_id)) < 100:
         await asyncio.sleep(2)
