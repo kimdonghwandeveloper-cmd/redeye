@@ -1,6 +1,7 @@
 
 import os
 import asyncio
+import time
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
@@ -8,6 +9,9 @@ from zapv2 import ZAPv2
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from src.database import db
+from src.rag_engine import rag_engine
 
 # 1. 환경 설정 로드 (로컬 .env 또는 Railway Variables)
 load_dotenv()
@@ -17,8 +21,17 @@ ZAP_URL = os.getenv("ZAP_URL", "http://zap-service.railway.internal:8080")
 ZAP_API_KEY = os.getenv("ZAP_API_KEY", "redeye1234")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# 2. FastAPI 앱 초기화
-app = FastAPI(title="RedEye: AI Security Scanner", version="1.0.0")
+# 2. FastAPI 앱 초기화 (Lifespan으로 DB 연결)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    db.connect()
+    rag_engine.initialize()
+    yield
+    # Shutdown
+    await db.close()
+
+app = FastAPI(title="RedEye: AI Security Scanner", version="2.0.0", lifespan=lifespan)
 
 # 3. ZAP 클라이언트 연결 설정
 # Railway 내부 통신일 때는 프록시 설정이 필요 없을 수 있으나, 명시적으로 지정
@@ -102,18 +115,38 @@ async def run_zap_scan(target_url: str):
 
 async def analyze_with_ai(alerts: List[dict]) -> str:
     if not alerts:
-        return "보안 취약점이 발견되지 않았습니다. (시스템이 매우 안전하거나, 스캔이 제대로 동작하지 않았습니다.)"
+        return "보안 취약점이 발견되지 않았습니다."
 
-    # High/Medium 위험도만 필터링해서 토큰 절약
     critical_alerts = [a for a in alerts if a.get('risk') in ['High', 'Medium']]
     
     if not critical_alerts:
-        return "치명적인(High/Medium) 취약점은 발견되지 않았습니다. Low 레벨 경고만 존재합니다."
+        return "치명적인(High/Medium) 취약점은 발견되지 않았습니다."
+
+    # --- RAG: 과거 유사 사례 검색 ---
+    rag_context = ""
+    try:
+        # 가장 위험한 취약점 하나를 골라서 유사 사례 검색 (데모용)
+        # 실제로는 모든 Alert에 대해 검색하거나 요약해서 검색해야 함
+        query_alert = critical_alerts[0]
+        query_text = f"{query_alert.get('name')} {query_alert.get('description')}"
+        
+        similar_docs = await rag_engine.search_similar_issues(query_text)
+        if similar_docs:
+            rag_context = "\n\n## 📚 Past Similar Incidents (RAG Context):\n"
+            for doc in similar_docs:
+                rag_context += f"- {doc.page_content[:200]}...\n"
+    except Exception as e:
+        print(f"RAG Error: {e}")
 
     # AI에게 보낼 메시지 구성
-    # JSON 전체를 문자열로 변환하여 전송
-    user_message = f"Here is the raw ZAP Alert Data (JSON):\n{str(critical_alerts)[:15000]}" 
-    # 토큰 제한 고려하여 15000자 정도만 (필요시 조절)
+    user_message = f"""
+    Here is the raw ZAP Alert Data (JSON):
+    {str(critical_alerts)[:10000]}
+
+    {rag_context}
+    
+    If 'Past Similar Incidents' are provided, please reference them in your analysis to suggest consistent solutions.
+    """
 
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
@@ -130,16 +163,27 @@ def health_check():
 
 @app.post("/scan", response_model=ScanResult)
 async def start_scan(request: ScanRequest):
-    """
-    URL을 받아서 ZAP 스캔을 돌리고 -> AI 분석 결과를 반환
-    (오래 걸리므로 실제 프로덕션에서는 비동기 큐(Celery/Redis) 권장)
-    """
     try:
         # 1. ZAP 스캔 수행
         raw_alerts = await run_zap_scan(request.target_url)
         
-        # 2. AI 분석 수행
+        # 2. AI 분석 수행 (RAG 포함)
         analysis_report = await analyze_with_ai(raw_alerts)
+        
+        # 3. 데이터 저장 (RAG 학습)
+        # 중요 취약점만 벡터 DB에 저장
+        critical_alerts = [a for a in raw_alerts if a.get('risk') in ['High', 'Medium']]
+        if critical_alerts:
+            await rag_engine.ingest_alerts(critical_alerts)
+            
+        # 4. 전체 결과 저장 (로그용)
+        if db.get_db() is not None:
+             await db.get_db()["scan_history"].insert_one({
+                 "target": request.target_url,
+                 "alerts_count": len(raw_alerts),
+                 "analysis": analysis_report,
+                 "timestamp": time.time() # time import needed? No, use datetime or skip for MVP
+             })
         
         return {
             "target": request.target_url,

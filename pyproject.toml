@@ -17,6 +17,9 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "python-owasp-zap-v2-4>=0.1.0",
     "uvicorn>=0.40.0",
+    "motor>=3.3.2",
+    "langchain-mongodb>=0.1.0",
+    "tiktoken>=0.5.2",
 ]
 
 [project.scripts]
