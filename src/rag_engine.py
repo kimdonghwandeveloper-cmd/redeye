@@ -3,27 +3,38 @@ from typing import List, Dict
 from langchain_openai import OpenAIEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_core.documents import Document
-from .database import db
+from pymongo import MongoClient
+import os
+
+# ... imports ...
 
 class RAGService:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.vector_store = None
+        self.mongo_client = None
 
     def initialize(self):
-        """Must be called after db.connect()"""
-        if db.get_db() is not None:
-            collection = db.get_db()["scans"]
+        """Use synchronous PyMongo for LangChain compatibility"""
+        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI") or os.getenv("MONGO_URL")
+        if not mongo_uri:
+            print("⚠️ MONGO_URI not found. RAG disabled.")
+            return
+
+        try:
+            self.mongo_client = MongoClient(mongo_uri)
+            collection = self.mongo_client["RedEye"]["scans"]
+            
             # MongoDB Atlas Vector Search Setup
             self.vector_store = MongoDBAtlasVectorSearch(
                 collection=collection,
                 embedding=self.embeddings,
-                index_name="vector_index", # The name you typed in Atlas UI
+                index_name="vector_index", 
                 relevance_score_fn="cosine",
             )
-            print("🧠 RAG Engine Initialized (MongoDB Atlas)")
-        else:
-            print("⚠️ DB not connected. RAG disabled.")
+            print("🧠 RAG Engine Initialized (MongoDB Atlas via PyMongo)")
+        except Exception as e:
+            print(f"❌ RAG Init Failed: {e}")
 
     async def ingest_alerts(self, alerts: List[Dict]):
         """Save new alerts to Vector DB for future reference"""
