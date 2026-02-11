@@ -1,85 +1,55 @@
-import os
-from typing import List, Dict
-from langchain_openai import OpenAIEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
 from pymongo import MongoClient
 import os
 
-# ... imports ...
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+DB_NAME = "redeye"
 
 class RAGService:
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        self.embeddings = OpenAIEmbeddings()
         self.vector_store = None
-        self.mongo_client = None
+        self.collection_name = "vulnerability_vectors"
+        self.client = None
 
-    def initialize(self):
-        """Use synchronous PyMongo for LangChain compatibility"""
-        mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI") or os.getenv("MONGO_URL")
-        if not mongo_uri:
-            print("⚠️ MONGO_URI not found. RAG disabled.")
-            return
+    async def initialize(self):
+        """Initialize the vector store with the MongoDB collection (Sync for LangChain compatibility)."""
+        # LangChain MongoDB vector store works best with PyMongo for now
+        self.client = MongoClient(MONGO_URI)
+        collection = self.client[DB_NAME][self.collection_name]
+        
+        self.vector_store = MongoDBAtlasVectorSearch(
+            collection=collection,
+            embedding=self.embeddings,
+            index_name="default",
+            relevance_score_fn="cosine",
+        )
+        print("✅ RAG Service Initialized (Sync PyMongo)")
 
-        try:
-            self.mongo_client = MongoClient(mongo_uri)
-            collection = self.mongo_client["RedEye"]["scans"]
-            
-            # MongoDB Atlas Vector Search Setup
-            self.vector_store = MongoDBAtlasVectorSearch(
-                collection=collection,
-                embedding=self.embeddings,
-                index_name="vector_index", 
-                relevance_score_fn="cosine",
+    async def ingest_alert(self, alert_text: str, metadata: dict):
+        """Save a vulnerability alert to the vector store."""
+        if self.vector_store:
+            # add_texts is sync in LangChain standard, but might be async supported?
+            # actually asimilarity_search implies async support, but let's stick to standard methods.
+            # If using sync client, we should probably use sync add_texts. 
+            # But the method is async def. We can run it in executor or just call sync method if it's fast.
+            # aadd_texts is the async version.
+            await self.vector_store.aadd_texts(
+                texts=[alert_text],
+                metadatas=[metadata]
             )
-            print("🧠 RAG Engine Initialized (MongoDB Atlas via PyMongo)")
-        except Exception as e:
-            print(f"❌ RAG Init Failed: {e}")
+            print(f"📥 Ingested alert: {alert_text[:50]}...")
 
-    async def ingest_alerts(self, alerts: List[Dict]):
-        """Save new alerts to Vector DB for future reference"""
-        if not self.vector_store:
-            return
-
-        documents = []
-        for alert in alerts:
-            # Create a rich text representation for embedding
-            content = f"Risk: {alert.get('risk')}\nName: {alert.get('name')}\nDescription: {alert.get('description')}\nSolution: {alert.get('solution')}"
-            
-            # Metadata for filtering/reference
-            metadata = {
-                "risk": alert.get("risk"),
-                "name": alert.get("name"),
-                "url": alert.get("url"),
-                "scan_id": alert.get("scan_id", "unknown")
-            }
-            
-            documents.append(Document(page_content=content, metadata=metadata))
-
-        if documents:
-            # Add documents to vector store (This is blocking in LangChain default, but fast enough for small batches)
-            # ideally, run in executor if heavy.
-            self.vector_store.add_documents(documents)
-            print(f"📥 Ingested {len(documents)} alerts into Knowledge Base.")
-
-    async def search_similar_issues(self, query_text: str, k: int = 3) -> List[Document]:
-        """Retrieve similar past vulnerabilities"""
+    async def search_similar_alerts(self, query: str, k: int = 3):
+        """Search for similar past alerts."""
         if not self.vector_store:
             return []
         
-        # Async search provided by langchain-mongodb?
-        # Current version often sync, but let's try standard invocation or invoke in thread if needed.
-        # Motor is async, but LangChain's wrapper might block. For now, we assume it's acceptable or wrapped.
-        
-        # NOTE: langchain-mongodb usually uses synchronous pymongo or wraps it? 
-        # Actually MongoDBAtlasVectorSearch uses pymongo (sync) by default.
-        # Ideally we should use `asimilarity_search` if available, or run in thread.
-        
-        try:
-            results = self.vector_store.similarity_search(query_text, k=k)
-            return results
-        except Exception as e:
-            print(f"❌ Vector Search Error: {e}")
-            return []
+        # asimilarity_search should work if the vector store supports it. 
+        # With PyMongo (sync), asimilarity_search usually delegates to run_in_executor.
+        results = await self.vector_store.asimilarity_search(query, k=k)
+        return results
 
-rag_engine = RAGService()
+rag_service = RAGService()
+

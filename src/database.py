@@ -4,26 +4,32 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI") or os.getenv("MONGO_URL")
-DB_NAME = "RedEye"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+DB_NAME = "redeye"
 
 class Database:
     client: AsyncIOMotorClient = None
-    
-    def connect(self):
-        if not MONGO_URI:
-            print("⚠️ MONGO_URI not found in env. Database features will be disabled.")
-            return
-        
-        self.client = AsyncIOMotorClient(MONGO_URI)
-        print("✅ Connected to MongoDB via Motor")
+    db = None
 
-    def get_db(self):
-        return self.client[DB_NAME] if self.client else None
+    @classmethod
+    async def connect(cls):
+        """Connect to MongoDB."""
+        if cls.client is None:
+            cls.client = AsyncIOMotorClient(MONGO_URI)
+            cls.db = cls.client[DB_NAME]
+            print(f"✅ Connected to MongoDB: {DB_NAME}")
 
-    async def close(self):
-        if self.client:
-            self.client.close()
-            print("🛑 Closed MongoDB connection")
+    @classmethod
+    async def close(cls):
+        """Close MongoDB connection."""
+        if cls.client:
+            cls.client.close()
+            cls.client = None
+            print("❌ Closed MongoDB connection")
+
+    @classmethod
+    def get_collection(cls, name: str):
+        """Get a collection."""
+        return cls.db[name]
 
 db = Database()

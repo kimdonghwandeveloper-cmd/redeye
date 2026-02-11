@@ -5,7 +5,7 @@ import {
     Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon
 } from '@chakra-ui/react';
 import { Scan as ScanIcon, ShieldAlert, BrainCircuit, Play } from 'lucide-react';
-import { startScan, ScanResult } from './api';
+import { startScan, type ScanResult } from './api';
 
 export default function ScanPage() {
     const [url, setUrl] = useState('');

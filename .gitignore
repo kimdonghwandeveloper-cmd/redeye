@@ -16,3 +16,6 @@ npm-debug.log
 yarn-error.log
 dist/
 .DS_Store
+
+# Large Model Files
+redeye-detection-model/
