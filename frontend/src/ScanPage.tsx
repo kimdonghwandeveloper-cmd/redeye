@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import {
     Box, Button, Input, VStack, Heading, Text, useToast,
-    Container, Card, CardHeader, CardBody, Code, Divider,
-    Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon
+    Container, Card, CardHeader, CardBody, Divider
 } from '@chakra-ui/react';
-import { Scan as ScanIcon, ShieldAlert, BrainCircuit, Play } from 'lucide-react';
+import { ShieldAlert, BrainCircuit, Play } from 'lucide-react';
 import { startScan, type ScanResult } from './api';
 
 export default function ScanPage() {

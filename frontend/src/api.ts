@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Railway Backend URL (Hardcoded for MVP, better to use env)
-const API_BASE_URL = "https://redeye-production.up.railway.app";
+// Backend URL (Environment Variable or Default)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
