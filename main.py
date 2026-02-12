@@ -26,6 +26,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RedEye: AI Security Agent", version="2.0.0", lifespan=lifespan)
 
+# --- CORS Configuration ---
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (Frontend, n8n, etc.)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (POST, GET, OPTIONS, etc.)
+    allow_headers=["*"],
+)
+
 # --- Pydantic Models ---
 class ScanRequest(BaseModel):
     target_url: str
