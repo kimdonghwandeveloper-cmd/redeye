@@ -66,7 +66,8 @@ export default function ScanPage() {
                     } else if (statusRes.status === 'failed') {
                         clearInterval(pollInterval);
                         setLoading(false);
-                        toast({ title: 'Scan Failed', description: 'Agent encountered an error.', status: 'error' });
+                        const errorMsg = statusRes.agent_response || 'Agent encountered an unknown error.';
+                        toast({ title: 'Scan Failed', description: errorMsg, status: 'error', duration: 9000, isClosable: true });
                     } else {
                         setStatusMessage(language === 'ko' ? 'AI가 취약점을 분석 중입니다... (1~2분 소요)' : 'AI is analyzing vulnerabilities... (This may take 1-2 mins)');
                     }
