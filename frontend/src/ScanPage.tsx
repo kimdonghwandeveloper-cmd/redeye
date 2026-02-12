@@ -167,7 +167,7 @@ export default function ScanPage() {
                                                             startAngle={180} endAngle={0}
                                                             dataKey="value"
                                                         >
-                                                            {getChartData(scoreData.current).map((entry, index) => (
+                                                            {getChartData(scoreData.current).map((_entry, index) => (
                                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                             ))}
                                                         </Pie>
@@ -191,7 +191,7 @@ export default function ScanPage() {
                                                             startAngle={180} endAngle={0}
                                                             dataKey="value"
                                                         >
-                                                            {getChartData(scoreData.projected).map((entry, index) => (
+                                                            {getChartData(scoreData.projected).map((_entry, index) => (
                                                                 <Cell key={`cell-${index}`} fill={PROJECTED_COLORS[index % PROJECTED_COLORS.length]} />
                                                             ))}
                                                         </Pie>
