@@ -44,8 +44,10 @@ app.add_middleware(
 import uuid
 
 # --- Pydantic Models ---
+# --- Pydantic Models ---
 class ScanRequest(BaseModel):
     target_url: str
+    language: Optional[str] = "en"
 
 class ScanResponse(BaseModel):
     scan_id: str
@@ -54,16 +56,18 @@ class ScanResponse(BaseModel):
     agent_response: Optional[str] = None
 
 # --- Background Task ---
-async def background_scan_task(scan_id: str, target_url: str):
+async def background_scan_task(scan_id: str, target_url: str, language: str = "en"):
     """
     Background worker to run the heavy AI scan.
     """
     try:
-        print(f"🕵️‍♂️ [Worker] Starting scan for {scan_id} ({target_url})")
+        print(f"🕵️‍♂️ [Worker] Starting scan for {scan_id} ({target_url}) in {language}")
         
         # 1. Run the Agent
+        lang_instruction = "IMPORTANT: Please respond in Korean (한국어)." if language == "ko" else "IMPORTANT: Please respond in English."
+        
         result = await agent_executor.ainvoke({
-            "input": f"Please perform a full security scan on {target_url}. If you find vulnerabilities, verify them with your tools and suggest fixes based on past solutions."
+            "input": f"Please perform a full security scan on {target_url}. If you find vulnerabilities, verify them with your tools and suggest fixes based on past solutions.\n\n{lang_instruction}"
         })
         agent_output = result["output"]
 
@@ -98,7 +102,7 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     await db.create_scan(scan_id, request.target_url)
 
     # 2. Add to Background Queue
-    background_tasks.add_task(background_scan_task, scan_id, request.target_url)
+    background_tasks.add_task(background_scan_task, scan_id, request.target_url, request.language)
 
     return {
         "scan_id": scan_id,

@@ -18,8 +18,8 @@ export interface ScanResponse {
     agent_response?: string;
 }
 
-export const startScan = async (targetUrl: string): Promise<ScanResponse> => {
-    const response = await api.post<ScanResponse>("/scan", { target_url: targetUrl });
+export const startScan = async (targetUrl: string, language: string = "en"): Promise<ScanResponse> => {
+    const response = await api.post<ScanResponse>("/scan", { target_url: targetUrl, language });
     return response.data;
 };
 
