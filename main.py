@@ -17,7 +17,11 @@ ZAP_URL = settings.ZAP_URL
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await db.connect()
+    try:
+        await db.connect()
+    except Exception as e:
+        print(f"❌ Failed to connect to MongoDB: {e}")
+    
     await rag_service.initialize()
     # expert_model.load_model() # Optional: Preload model on startup
     yield
@@ -31,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins (Frontend, n8n, etc.)
-    allow_credentials=True,
+    allow_credentials=False, # Must be False if origins=["*"]
     allow_methods=["*"],  # Allow all methods (POST, GET, OPTIONS, etc.)
     allow_headers=["*"],
 )
@@ -64,12 +68,16 @@ async def background_scan_task(scan_id: str, target_url: str):
         agent_output = result["output"]
 
         # 2. Update DB as Completed
-        await db.update_scan(scan_id, "completed", agent_output)
-        print(f"✅ [Worker] Scan completed for {scan_id}")
+        if db.db is not None:
+             await db.update_scan(scan_id, "completed", agent_output)
+             print(f"✅ [Worker] Scan completed for {scan_id}")
+        else:
+             print(f"❌ [Worker] DB is not connected. Cannot update scan {scan_id}")
 
     except Exception as e:
         print(f"❌ [Worker] Scan failed for {scan_id}: {e}")
-        await db.update_scan(scan_id, "failed", {"error": str(e)})
+        if db.db is not None:
+            await db.update_scan(scan_id, "failed", {"error": str(e)})
 
 # --- Endpoints ---
 @app.get("/")
@@ -81,6 +89,9 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     """
     Starts an asynchronous scan. Returns a scan_id immediately.
     """
+    if db.db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed. Check MONGO_URI.")
+
     scan_id = str(uuid.uuid4())
     
     # 1. Create Initial Record
