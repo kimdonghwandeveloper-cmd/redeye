@@ -64,7 +64,7 @@ async def search_past_solutions(query: str) -> str:
         return "\n---\n".join(output) if output else "No past similar incidents found."
     except Exception as e:
         print(f"⚠️ RAG Search Failed (DB Offline?): {e}")
-        return "MOCK SOLUTION: Use parameterized queries to prevent SQL Injection. (Database connection failed, using fallback knowledge.)"
+        return "No similar past incidents found. (RAG Search unavailable)"
 
 tools = [run_zap_scan, verify_vulnerability, generate_fix, search_past_solutions]
 
@@ -92,21 +92,27 @@ The final report should be in Markdown, listing each vulnerability with:
 - Reference (Past Solutions)
 
 IMPORTANT:
+If `run_zap_scan` returns an empty list or only informative/low alerts that are not actionable:
+1. State clearly that no significant vulnerabilities were detected.
+2. Set "current_score" to 100.
+3. Set "risk_breakdown" to an empty list [].
+4. Do NOT invent or hallucinate vulnerabilities (like SQL Injection) if they are not present in the scan results.
+
 At the very end of your response, you MUST append a JSON block wrapped in ```json tags.
 This JSON block contains the quantative security analysis.
 Format:
 ```json
 {{
-  "current_score": <0-100 integer, 100 is perfectly secure>,
-  "projected_score": <0-100 integer, score after applying your fixes>,
+  "current_score": <0-100 integer>,
+  "projected_score": <0-100 integer>,
   "risk_breakdown": [
-    {{"vulnerability": "SQL Injection", "impact": -20, "fix_improvement": +20}},
-    {{"vulnerability": "XSS", "impact": -10, "fix_improvement": +10}}
+    {{"vulnerability": "SQL Injection", "impact": -20, "fix_improvement": +20}}
+    // Leave this list EMPTY if no vulnerabilities are found.
   ]
 }}
 ```
 Calculate the score: Start at 100. Deduct points for each vulnerability (High: -20, Medium: -10, Low: -5).
-Projected score is the score if all suggested fixes are applied.
+projected_score should be 100 if current_score is 100.
 """),
     ("user", "{input}"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
