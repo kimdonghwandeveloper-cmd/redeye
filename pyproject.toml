@@ -24,7 +24,7 @@ dependencies = [
     "torchaudio",
     "tiktoken",
     "motor",
-    "pymongo",
+    "pymongo[srv]",
     "python-owasp-zap-v2-4",
     # LangChain Stack (Relaxed for uv compatibility)
     "langchain>=0.2.16",

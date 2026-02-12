@@ -12,6 +12,7 @@ class Database:
         if cls.client is None:
             cls.client = AsyncIOMotorClient(
                 settings.MONGO_URI,
+                tls=True,
                 tlsCAFile=certifi.where()
             )
             cls.db = cls.client[settings.DB_NAME]
