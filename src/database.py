@@ -8,8 +8,12 @@ class Database:
     @classmethod
     async def connect(cls):
         """Connect to MongoDB."""
+        import certifi
         if cls.client is None:
-            cls.client = AsyncIOMotorClient(settings.MONGO_URI)
+            cls.client = AsyncIOMotorClient(
+                settings.MONGO_URI,
+                tlsCAFile=certifi.where()
+            )
             cls.db = cls.client[settings.DB_NAME]
             print(f"✅ Connected to MongoDB: {settings.DB_NAME}")
 
