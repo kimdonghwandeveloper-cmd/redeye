@@ -8,7 +8,7 @@ load_dotenv()
 class Settings(BaseSettings):
     # API Keys
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+    MONGO_URI: str = os.getenv("MONGO_URI", os.getenv("MONGODB_URI", "mongodb://localhost:27017"))
     GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
     HF_TOKEN: str = os.getenv("HF_TOKEN", "")
 
