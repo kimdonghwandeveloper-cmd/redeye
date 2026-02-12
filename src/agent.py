@@ -96,14 +96,14 @@ At the very end of your response, you MUST append a JSON block wrapped in ```jso
 This JSON block contains the quantative security analysis.
 Format:
 ```json
-{
+{{
   "current_score": <0-100 integer, 100 is perfectly secure>,
   "projected_score": <0-100 integer, score after applying your fixes>,
   "risk_breakdown": [
-    {"vulnerability": "SQL Injection", "impact": -20, "fix_improvement": +20},
-    {"vulnerability": "XSS", "impact": -10, "fix_improvement": +10}
+    {{"vulnerability": "SQL Injection", "impact": -20, "fix_improvement": +20}},
+    {{"vulnerability": "XSS", "impact": -10, "fix_improvement": +10}}
   ]
-}
+}}
 ```
 Calculate the score: Start at 100. Deduct points for each vulnerability (High: -20, Medium: -10, Low: -5).
 Projected score is the score if all suggested fixes are applied.
