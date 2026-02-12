@@ -10,13 +10,20 @@ export const api = axios.create({
     },
 });
 
-export interface ScanResult {
+// Scan Response (Async)
+export interface ScanResponse {
+    scan_id: string;
+    status: "pending" | "completed" | "failed";
     target: string;
-    alerts_count: number;
-    ai_analysis: string;
+    agent_response?: string;
 }
 
-export const startScan = async (targetUrl: string): Promise<ScanResult> => {
-    const response = await api.post<ScanResult>("/scan", { target_url: targetUrl });
+export const startScan = async (targetUrl: string): Promise<ScanResponse> => {
+    const response = await api.post<ScanResponse>("/scan", { target_url: targetUrl });
+    return response.data;
+};
+
+export const getScanStatus = async (scanId: string): Promise<ScanResponse> => {
+    const response = await api.get<ScanResponse>(`/scan/${scanId}`);
     return response.data;
 };

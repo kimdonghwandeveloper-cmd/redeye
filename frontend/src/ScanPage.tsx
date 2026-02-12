@@ -3,13 +3,14 @@ import {
     Box, Button, Input, VStack, Heading, Text, useToast,
     Container, Card, CardHeader, CardBody, Divider
 } from '@chakra-ui/react';
-import { ShieldAlert, BrainCircuit, Play } from 'lucide-react';
-import { startScan, type ScanResult } from './api';
+import { ShieldAlert, BrainCircuit, Play, Loader2 } from 'lucide-react';
+import { startScan, getScanStatus, type ScanResponse } from './api';
 
 export default function ScanPage() {
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<ScanResult | null>(null);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [result, setResult] = useState<ScanResponse | null>(null);
     const toast = useToast();
 
     const handleScan = async () => {
@@ -20,14 +21,42 @@ export default function ScanPage() {
 
         setLoading(true);
         setResult(null);
+        setStatusMessage('Initializing Scan...');
+
         try {
-            const data = await startScan(url);
-            setResult(data);
-            toast({ title: 'Scan Completed!', status: 'success' });
+            // 1. Start Scan (Get ID)
+            const initialRes = await startScan(url);
+            const scanId = initialRes.scan_id;
+            console.log("Scan Started:", scanId);
+
+            // 2. Poll Status
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await getScanStatus(scanId);
+                    console.log("Polling Status:", statusRes.status);
+
+                    if (statusRes.status === 'completed') {
+                        clearInterval(pollInterval);
+                        setResult(statusRes);
+                        setLoading(false);
+                        toast({ title: 'Scan Completed!', status: 'success' });
+                    } else if (statusRes.status === 'failed') {
+                        clearInterval(pollInterval);
+                        setLoading(false);
+                        toast({ title: 'Scan Failed', description: 'Agent encountered an error.', status: 'error' });
+                    } else {
+                        setStatusMessage('AI is analyzing vulnerabilities... (This may take 1-2 mins)');
+                    }
+                } catch (err) {
+                    clearInterval(pollInterval);
+                    setLoading(false);
+                    toast({ title: 'Polling Error', description: String(err), status: 'error' });
+                }
+            }, 3000); // Check every 3 seconds
+
         } catch (error) {
-            toast({ title: 'Scan Failed', description: String(error), status: 'error' });
-        } finally {
             setLoading(false);
+            toast({ title: 'Start Failed', description: String(error), status: 'error' });
         }
     };
 
@@ -53,13 +82,13 @@ export default function ScanPage() {
                                 border="none"
                             />
                             <Button
-                                rightIcon={<Play size={20} />}
+                                rightIcon={loading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
                                 colorScheme="red"
                                 size="lg"
                                 width="full"
                                 onClick={handleScan}
                                 isLoading={loading}
-                                loadingText="Running ZAP & AI Analysis..."
+                                loadingText={statusMessage}
                             >
                                 Start Security Scan
                             </Button>
@@ -73,7 +102,7 @@ export default function ScanPage() {
                             <CardHeader pb={0}>
                                 <Heading size="md" display="flex" alignItems="center" gap={2}>
                                     <ShieldAlert className="text-red-500" />
-                                    Vulnerabilities Found: {result.alerts_count}
+                                    Scan Results
                                 </Heading>
                             </CardHeader>
                             <CardBody>
@@ -91,7 +120,7 @@ export default function ScanPage() {
                             <CardBody>
                                 <Box whiteSpace="pre-wrap" fontSize="sm">
                                     {/* Basic markdown rendering workaround for MVP */}
-                                    {result.ai_analysis.split('\n').map((line, i) => {
+                                    {result.agent_response?.split('\n').map((line: string, i: number) => {
                                         if (line.startsWith('# ')) return <Heading key={i} size="lg" mt={4} mb={2}>{line.replace('# ', '')}</Heading>
                                         if (line.startsWith('## ')) return <Heading key={i} size="md" mt={4} mb={2} color="purple.300">{line.replace('## ', '')}</Heading>
                                         if (line.startsWith('- ')) return <Text key={i} ml={4}>• {line.replace('- ', '')}</Text>

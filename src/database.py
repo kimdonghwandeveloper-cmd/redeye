@@ -22,8 +22,36 @@ class Database:
             print("❌ Closed MongoDB connection")
 
     @classmethod
-    def get_collection(cls, name: str):
+    async def get_collection(cls, name: str):
         """Get a collection."""
         return cls.db[name]
+
+    @classmethod
+    async def create_scan(cls, scan_id: str, target_url: str):
+        """Create a new scan record."""
+        await cls.db["scans"].insert_one({
+            "scan_id": scan_id,
+            "target": target_url,
+            "status": "pending",
+            "agent_response": None,
+            "created_at": None  # Will be set by time.time() in main
+        })
+
+    @classmethod
+    async def update_scan(cls, scan_id: str, status: str, result: dict = None):
+        """Update scan status and result."""
+        update_data = {"status": status}
+        if result:
+            update_data["agent_response"] = result
+        
+        await cls.db["scans"].update_one(
+            {"scan_id": scan_id},
+            {"$set": update_data}
+        )
+
+    @classmethod
+    async def get_scan(cls, scan_id: str):
+        """Get scan by ID."""
+        return await cls.db["scans"].find_one({"scan_id": scan_id}, {"_id": 0})
 
 db = Database()
