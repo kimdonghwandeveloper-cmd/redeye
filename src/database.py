@@ -1,11 +1,5 @@
-import os
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
-
-load_dotenv()
-
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME = "redeye"
+from .config import settings
 
 class Database:
     client: AsyncIOMotorClient = None
@@ -15,9 +9,9 @@ class Database:
     async def connect(cls):
         """Connect to MongoDB."""
         if cls.client is None:
-            cls.client = AsyncIOMotorClient(MONGO_URI)
-            cls.db = cls.client[DB_NAME]
-            print(f"✅ Connected to MongoDB: {DB_NAME}")
+            cls.client = AsyncIOMotorClient(settings.MONGO_URI)
+            cls.db = cls.client[settings.DB_NAME]
+            print(f"✅ Connected to MongoDB: {settings.DB_NAME}")
 
     @classmethod
     async def close(cls):

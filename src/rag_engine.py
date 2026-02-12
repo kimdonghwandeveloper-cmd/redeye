@@ -1,10 +1,7 @@
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_openai import OpenAIEmbeddings
 from pymongo import MongoClient
-import os
-
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME = "redeye"
+from .config import settings
 
 class RAGService:
     def __init__(self):
@@ -16,8 +13,8 @@ class RAGService:
     async def initialize(self):
         """Initialize the vector store with the MongoDB collection (Sync for LangChain compatibility)."""
         # LangChain MongoDB vector store works best with PyMongo for now
-        self.client = MongoClient(MONGO_URI)
-        collection = self.client[DB_NAME][self.collection_name]
+        self.client = MongoClient(settings.MONGO_URI)
+        collection = self.client[settings.DB_NAME][self.collection_name]
         
         self.vector_store = MongoDBAtlasVectorSearch(
             collection=collection,

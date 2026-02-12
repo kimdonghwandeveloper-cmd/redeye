@@ -3,16 +3,15 @@ import time
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from dotenv import load_dotenv
 from contextlib import asynccontextmanager
+from src.config import settings
 from src.database import db
 from src.rag_engine import rag_service
 from src.expert_model import expert_model
 from src.agent import agent_executor
 
-# 1. Load Config
-load_dotenv()
-ZAP_URL = os.getenv("ZAP_URL", "http://zap-service.railway.internal:8080")
+# 1. Load Config (Handled by settings)
+ZAP_URL = settings.ZAP_URL
 
 # 2. Lifecycle Manager
 @asynccontextmanager

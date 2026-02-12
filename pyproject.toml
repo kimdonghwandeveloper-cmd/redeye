@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "karl3408", email = "karl34408@gmail.com" }
+    { name = "karl3408", email = "kimdonghwandeveloper@gmail.com" }
 ]
 requires-python = ">=3.10"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
     "requests",
     "python-dotenv",
     "datasets",
-    "transformers",
+    "transformers==4.44.2",
     "scikit-learn",
     "evaluate",
     "accelerate",
@@ -26,13 +26,14 @@ dependencies = [
     "motor",
     "pymongo",
     "python-owasp-zap-v2-4",
-    # Stable LangChain 0.2.x Stack
-    "langchain==0.2.16",
-    "langchain-community==0.2.16",
-    "langchain-core==0.2.38",
-    "langchain-openai==0.1.23",
-    "langchain-mongodb==0.1.6",
-    "langchain-text-splitters==0.2.4",
+    # LangChain Stack (Relaxed for uv compatibility)
+    "langchain>=0.2.16",
+    "langchain-community>=0.2.16",
+    "langchain-core>=0.2.38",
+    "langchain-openai>=0.1.23",
+    "langchain-mongodb>=0.1.6",
+    "langchain-text-splitters>=0.2.4",
+    "peft",
 ]
 
 [project.scripts]

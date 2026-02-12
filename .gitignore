@@ -19,3 +19,8 @@ dist/
 
 # Large Model Files
 redeye-detection-model/
+redeye-repair-model/
+*.safetensors
+adapter_model.bin
+__pycache__/
+.pytest_cache/
