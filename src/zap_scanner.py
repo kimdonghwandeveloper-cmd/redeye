@@ -31,15 +31,9 @@ class ZapScanner:
             
         except Exception as e:
             print(f"⚠️ [ZAP] Connection failed or ZAP not running: {e}")
-            print("🔄 Switching to MOCK MODE for testing...")
+            # print("🔄 Switching to MOCK MODE for testing...")
             
-            # Return a dummy alert to test Agent Flow
-            return [{
-                "alert": "SQL Injection",
-                "risk": "High",
-                "description": "SQL Injection detected in query parameter 'id'. The application allows unsuspecting users to execute arbitrary SQL commands.",
-                "other": "Code Snippet:\n query = 'SELECT * FROM users WHERE id = ' + request.args.get('id')",
-                "solution": "Use prepared statements or parameterized queries."
-            }]
+            # Return empty list instead of fake vulnerability
+            return []
 
 zap_scanner = ZapScanner()

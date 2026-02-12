@@ -15,6 +15,14 @@ async def run_zap_scan(target_url: str) -> str:
     Scans a target URL using OWASP ZAP to find security vulnerabilities.
     Returns a JSON string of alerts. Use this tool first.
     """
+    if "github.com" in target_url:
+        return json.dumps([{
+            "alert": "ZAP Scan Skipped",
+            "risk": "Info",
+            "description": "ZAP scan was skipped because the target is a GitHub repository. ZAP requires a deployed web application URL.",
+            "other": "Please deploy the repository and scan the live URL for dynamic analysis."
+        }])
+
     alerts = await zap_scanner.scan(target_url)
     # Simplify alerts to save context window
     simple_alerts = []
