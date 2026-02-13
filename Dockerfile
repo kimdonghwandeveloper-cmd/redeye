@@ -5,7 +5,8 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 WORKDIR /app
 
 # Install system dependencies (SSL Certs)
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (SSL Certs & Git)
+RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
 
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1

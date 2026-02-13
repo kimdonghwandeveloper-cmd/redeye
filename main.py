@@ -32,6 +32,20 @@ app = FastAPI(title="RedEye: AI Security Agent", version="2.0.0", lifespan=lifes
 
 # --- CORS Configuration ---
 from fastapi.middleware.cors import CORSMiddleware
+
+@app.get("/models/metrics")
+async def get_model_metrics():
+    """
+    Returns training metrics for the detection model.
+    """
+    from src.services.training_metrics import training_metrics_service
+    return training_metrics_service.get_metrics()
+
+# Include Routers
+from src.auth.github import router as auth_router
+app.include_router(auth_router)
+
+# Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins (Frontend, n8n, etc.)
