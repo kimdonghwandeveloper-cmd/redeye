@@ -119,10 +119,14 @@ Format:
   "current_score": <0-100 integer>,
   "projected_score": <0-100 integer>,
   "risk_breakdown": [
-    {{"vulnerability": "Hardcoded Secret", "impact": -30, "fix_improvement": +30}}
-    // Leave this list EMPTY if no vulnerabilities are found.
+    {{"vulnerability": "Hardcoded Secret", "impact": -30, "fix_improvement": 30}}
   ]
 }}
+```
+Important: 
+- Do NOT include comments (no //) inside the JSON.
+- Do NOT use + signs for positive numbers.
+- Ensure the JSON is valid and parsable.
 ```
 Calculate the score: Start at 100. Deduct points for each vulnerability (High: -20, Medium: -10, Low: -5).
 projected_score should be 100 if current_score is 100.
