@@ -289,8 +289,12 @@ export default function ScanPage() {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             </Box>
-                                            <Heading size="xl" mt="-40px" color="red.400">{scoreData.current}</Heading>
-                                            <Badge colorScheme="red" mt={2}>High Risk</Badge>
+                                            <Heading size="xl" mt="-40px" color={scoreData.current >= 80 ? "green.400" : scoreData.current >= 50 ? "orange.400" : "red.400"}>
+                                                {scoreData.current}
+                                            </Heading>
+                                            <Badge colorScheme={scoreData.current >= 80 ? "green" : scoreData.current >= 50 ? "orange" : "red"} mt={2}>
+                                                {scoreData.current >= 80 ? "Safe" : scoreData.current >= 50 ? "Moderate Risk" : "High Risk"}
+                                            </Badge>
                                         </Box>
 
                                         {/* Projected Score */}
