@@ -25,9 +25,16 @@ class ExpertModel:
             print(f"🚀 Loading Detection Model from {settings.DETECTION_MODEL_PATH}...")
             self.detect_model = RobertaForSequenceClassification.from_pretrained(settings.DETECTION_MODEL_PATH, token=settings.HF_TOKEN)
             self.detect_tokenizer = RobertaTokenizer.from_pretrained(settings.DETECTION_MODEL_PATH, token=settings.HF_TOKEN)
+            
+            # Dynamic Quantization (Float32 -> Int8) to save memory
+            print("📉 Quantizing Detection Model (Dynamic Int8)...")
+            self.detect_model = torch.quantization.quantize_dynamic(
+                self.detect_model, {torch.nn.Linear}, dtype=torch.qint8
+            )
+            
             self.detect_model.to(self.device)
-            self.detect_model.eval()
-            print("✅ Detection Model Loaded")
+            # self.detect_model.eval() # Quantized model is already in eval mode mostly, but good practice.
+            print("✅ Detection Model Loaded & Quantized")
         except Exception as e:
             print(f"❌ Failed to load Detection Model: {e}")
             self.load_error = f"Detection: {str(e)}"
@@ -44,9 +51,16 @@ class ExpertModel:
             # T5-small adapter
             self.repair_model = AutoModelForSeq2SeqLM.from_pretrained(settings.REPAIR_MODEL_PATH, token=settings.HF_TOKEN)
             self.repair_tokenizer = AutoTokenizer.from_pretrained(settings.REPAIR_BASE_MODEL, token=settings.HF_TOKEN)
+            
+            # Dynamic Quantization (Float32 -> Int8) to save memory
+            print("📉 Quantizing Repair Model (Dynamic Int8)...")
+            self.repair_model = torch.quantization.quantize_dynamic(
+                self.repair_model, {torch.nn.Linear}, dtype=torch.qint8
+            )
+            
             self.repair_model.to(self.device)
-            self.repair_model.eval()
-            print("✅ Repair Model Loaded")
+            # self.repair_model.eval()
+            print("✅ Repair Model Loaded & Quantized")
         except Exception as e:
             print(f"❌ Failed to load Repair Model: {e}")
             self.load_error = f"Repair: {str(e)}"
