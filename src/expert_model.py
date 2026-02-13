@@ -20,33 +20,37 @@ class ExpertModel:
         # 1. Load Detection Model
         try:
             print(f"🚀 Loading Detection Model from {settings.DETECTION_MODEL_PATH}...")
-            self.detect_model = RobertaForSequenceClassification.from_pretrained(settings.DETECTION_MODEL_PATH)
-            self.detect_tokenizer = RobertaTokenizer.from_pretrained(settings.DETECTION_MODEL_PATH)
+            self.detect_model = RobertaForSequenceClassification.from_pretrained(settings.DETECTION_MODEL_PATH, token=settings.HF_TOKEN)
+            self.detect_tokenizer = RobertaTokenizer.from_pretrained(settings.DETECTION_MODEL_PATH, token=settings.HF_TOKEN)
             self.detect_model.to(self.device)
             self.detect_model.eval()
             print("✅ Detection Model Loaded")
         except Exception as e:
             print(f"❌ Failed to load Detection Model: {e}")
+            self.detect_model = None
+            self.detect_tokenizer = None
 
         # 2. Load Repair Model
         try:
             print(f"🚀 Loading Repair Model from {settings.REPAIR_MODEL_PATH}...")
             # T5-small adapter
-            self.repair_model = AutoModelForSeq2SeqLM.from_pretrained(settings.REPAIR_MODEL_PATH)
-            self.repair_tokenizer = AutoTokenizer.from_pretrained(settings.REPAIR_BASE_MODEL)
+            self.repair_model = AutoModelForSeq2SeqLM.from_pretrained(settings.REPAIR_MODEL_PATH, token=settings.HF_TOKEN)
+            self.repair_tokenizer = AutoTokenizer.from_pretrained(settings.REPAIR_BASE_MODEL, token=settings.HF_TOKEN)
             self.repair_model.to(self.device)
             self.repair_model.eval()
             print("✅ Repair Model Loaded")
         except Exception as e:
             print(f"❌ Failed to load Repair Model: {e}")
+            self.repair_model = None
+            self.repair_tokenizer = None
 
     def verify(self, code_snippet: str) -> dict:
         """
         Verify if code is SAFE or VULNERABLE.
         """
-        if not self.detect_model:
+        if not self.detect_model or not self.detect_tokenizer:
             self.load_models()
-            if not self.detect_model:
+            if not self.detect_model or not self.detect_tokenizer:
                 return {"label": "ERROR", "confidence": 0.0}
 
         inputs = self.detect_tokenizer(code_snippet, return_tensors="pt", truncation=True, max_length=512).to(self.device)
@@ -68,9 +72,9 @@ class ExpertModel:
         """
         Generate a fix for vulnerable code.
         """
-        if not self.repair_model:
+        if not self.repair_model or not self.repair_tokenizer:
             self.load_models()
-            if not self.repair_model:
+            if not self.repair_model or not self.repair_tokenizer:
                 return "Error: Repair model not loaded."
 
         input_text = f"fix vulnerability: {vulnerable_code}"

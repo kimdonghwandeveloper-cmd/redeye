@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     ZAP_API_KEY: str = os.getenv("ZAP_API_KEY", "")
 
     # Paths & Models
-    DETECTION_MODEL_PATH: str = "./redeye-detection-model"
-    REPAIR_MODEL_PATH: str = "./redeye-repair-model"
+    # Paths & Models
+    DETECTION_MODEL_PATH: str = os.getenv("DETECTION_MODEL_PATH", "./redeye-detection-model")
+    REPAIR_MODEL_PATH: str = os.getenv("REPAIR_MODEL_PATH", "./redeye-repair-model")
     REPAIR_BASE_MODEL: str = "t5-small"
     
     # DB Settings
