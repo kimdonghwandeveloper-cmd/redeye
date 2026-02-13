@@ -23,6 +23,46 @@ export const startScan = async (targetUrl: string, language: string = "en"): Pro
     return response.data;
 };
 
+// --- User Feedback API ---
+export const submitFeedback = async (
+    scanId: string,
+    vulnerability: string,
+    isAccurate: boolean,
+    comments: string = ""
+) => {
+    const response = await api.post("/feedback", {
+        scan_id: scanId,
+        vulnerability_name: vulnerability,
+        is_accurate: isAccurate,
+        comments: comments,
+    });
+    return response.data;
+};
+
+// --- Model Metrics API ---
+export const getModelMetrics = async () => {
+    const response = await api.get("/models/metrics");
+    return response.data;
+};
+
+// --- GitHub Integration API ---
+export interface GitHubRepo {
+    id: number;
+    name: string;
+    full_name: string;
+    html_url: string;
+    description?: string;
+    private: boolean;
+    language?: string;
+}
+
+export const getUserRepos = async (token: string): Promise<GitHubRepo[]> => {
+    const response = await api.get<GitHubRepo[]>("/user/repos", {
+        params: { token },
+    });
+    return response.data;
+};
+
 export const getScanStatus = async (scanId: string): Promise<ScanResponse> => {
     const response = await api.get<ScanResponse>(`/scan/${scanId}`);
     return response.data;

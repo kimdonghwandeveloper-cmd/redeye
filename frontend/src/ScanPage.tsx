@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box, Button, Input, VStack, Heading, Text, useToast,
-    Container, Card, CardHeader, CardBody, Flex, Badge, Select
+    Container, Card, CardHeader, CardBody, Flex, Badge, Select,
+    Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
+    List, ListItem, ListIcon, useDisclosure
 } from '@chakra-ui/react';
-import { ShieldAlert, BrainCircuit, Play, Loader2, Gauge, Globe } from 'lucide-react';
+import { ShieldAlert, BrainCircuit, Play, Loader2, Gauge, Globe, Github, Lock, Unlock } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
-import { startScan, getScanStatus, type ScanResponse } from './api';
+import { startScan, getScanStatus, getUserRepos, type ScanResponse, type GitHubRepo } from './api';
+
+
 
 export default function ScanPage() {
     const [url, setUrl] = useState('');
@@ -17,7 +21,49 @@ export default function ScanPage() {
     const [statusMessage, setStatusMessage] = useState('');
     const [result, setResult] = useState<ScanResponse | null>(null);
     const [scoreData, setScoreData] = useState<{ current: number; projected: number } | null>(null);
+
+    // GitHub Integration State
+    const [githubToken, setGithubToken] = useState<string | null>(null);
+    const [repos, setRepos] = useState<GitHubRepo[]>([]);
+    const { isOpen, onOpen, onClose } = useDisclosure();
+
     const toast = useToast();
+
+    // Check for GitHub Token on Mount
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const token = queryParams.get('github_token');
+        if (token) {
+            setGithubToken(token);
+            // Clear URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            toast({ title: 'GitHub Login Successful', status: 'success' });
+        }
+    }, [toast]);
+
+    const handleGitHubLogin = () => {
+        // Redirect to Backend Login Endpoint
+        // Use env var or hardcoded for now (matching backend)
+        const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        window.location.href = `${BACKEND_URL}/auth/github/login`;
+    };
+
+    const handleFetchRepos = async () => {
+        if (!githubToken) return;
+        try {
+            const userRepos = await getUserRepos(githubToken);
+            setRepos(userRepos);
+            onOpen();
+        } catch (error) {
+            toast({ title: 'Failed to fetch repos', description: String(error), status: 'error' });
+        }
+    };
+
+    const handleSelectRepo = (repoUrl: string) => {
+        setUrl(repoUrl);
+        onClose();
+        toast({ title: 'Repository Selected', status: 'info' });
+    };
 
     const handleScan = async () => {
         if (!url) {
@@ -138,9 +184,73 @@ export default function ScanPage() {
                             >
                                 {language === 'ko' ? '보안 스캔 시작' : 'Start Security Scan'}
                             </Button>
+
+                            {/* GitHub Integration Buttons */}
+                            <Flex gap={4} width="full">
+                                {!githubToken ? (
+                                    <Button
+                                        leftIcon={<Github size={20} />}
+                                        size="md"
+                                        width="full"
+                                        bg="#24292e"
+                                        color="white"
+                                        _hover={{ bg: "#1a1f24" }}
+                                        onClick={handleGitHubLogin}
+                                    >
+                                        Login with GitHub
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        leftIcon={<Github size={20} />}
+                                        size="md"
+                                        width="full"
+                                        colorScheme="gray"
+                                        variant="outline"
+                                        onClick={handleFetchRepos}
+                                    >
+                                        Select from GitHub
+                                    </Button>
+                                )}
+                            </Flex>
                         </VStack>
                     </CardBody>
                 </Card>
+
+                {/* Repo Selection Modal */}
+                <Modal isOpen={isOpen} onClose={onClose} size="xl">
+                    <ModalOverlay />
+                    <ModalContent bg="gray.800" color="white">
+                        <ModalHeader>Select Repository</ModalHeader>
+                        <ModalCloseButton />
+                        <ModalBody pb={6} maxHeight="400px" overflowY="auto">
+                            <List spacing={3}>
+                                {repos.map((repo) => (
+                                    <ListItem
+                                        key={repo.id}
+                                        p={3}
+                                        borderRadius="md"
+                                        _hover={{ bg: "gray.700", cursor: "pointer" }}
+                                        onClick={() => handleSelectRepo(repo.html_url)}
+                                        display="flex"
+                                        alignItems="center"
+                                        justifyContent="space-between"
+                                        border="1px solid"
+                                        borderColor="gray.700"
+                                    >
+                                        <Flex align="center" gap={3}>
+                                            <ListIcon as={repo.private ? Lock : Unlock} color={repo.private ? "orange.400" : "green.400"} />
+                                            <VStack align="start" spacing={0}>
+                                                <Text fontWeight="bold">{repo.full_name}</Text>
+                                                <Text fontSize="sm" color="gray.400">{repo.description || "No description"}</Text>
+                                            </VStack>
+                                        </Flex>
+                                        {repo.language && <Badge colorScheme="blue">{repo.language}</Badge>}
+                                    </ListItem>
+                                ))}
+                            </List>
+                        </ModalBody>
+                    </ModalContent>
+                </Modal>
 
                 {result && (
                     <VStack spacing={6} align="stretch" animation="fadeIn 0.5s">
