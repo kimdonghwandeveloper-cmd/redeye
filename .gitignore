@@ -24,3 +24,4 @@ redeye-repair-model/
 adapter_model.bin
 __pycache__/
 .pytest_cache/
+quantized_models/

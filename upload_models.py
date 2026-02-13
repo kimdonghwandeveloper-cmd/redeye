@@ -23,15 +23,16 @@ def upload_models():
         return
 
     # 2. Define Models to Upload
+    # 2. Define Models to Upload
     models = [
         {
-            "local_path": "./redeye-detection-model",
-            "repo_name": "redeye-detection-v2",
+            "local_path": "./quantized_models/redeye-detection-quantized",
+            "repo_name": "redeye-detection-quantized",
             "type": "model"
         },
         {
-            "local_path": "./redeye-repair-model",
-            "repo_name": "redeye-repair-v2",
+            "local_path": "./quantized_models/redeye-repair-quantized",
+            "repo_name": "redeye-repair-quantized",
             "type": "model"
         }
     ]
