@@ -14,6 +14,7 @@ class ExpertModel:
         self.repair_tokenizer = None
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.load_error = None
 
     def load_models(self):
         """Load both detection and repair models from disk."""
@@ -27,6 +28,7 @@ class ExpertModel:
             print("✅ Detection Model Loaded")
         except Exception as e:
             print(f"❌ Failed to load Detection Model: {e}")
+            self.load_error = str(e)
             self.detect_model = None
             self.detect_tokenizer = None
 
@@ -41,6 +43,7 @@ class ExpertModel:
             print("✅ Repair Model Loaded")
         except Exception as e:
             print(f"❌ Failed to load Repair Model: {e}")
+            if not self.load_error: self.load_error = str(e)
             self.repair_model = None
             self.repair_tokenizer = None
 
@@ -51,7 +54,7 @@ class ExpertModel:
         if not self.detect_model or not self.detect_tokenizer:
             self.load_models()
             if not self.detect_model or not self.detect_tokenizer:
-                return {"label": "ERROR", "confidence": 0.0}
+                return {"label": "ERROR", "confidence": 0.0, "error": f"Model load failed: {self.load_error}"}
 
         inputs = self.detect_tokenizer(code_snippet, return_tensors="pt", truncation=True, max_length=512).to(self.device)
         
@@ -75,7 +78,7 @@ class ExpertModel:
         if not self.repair_model or not self.repair_tokenizer:
             self.load_models()
             if not self.repair_model or not self.repair_tokenizer:
-                return "Error: Repair model not loaded."
+                return f"Error: Repair model not loaded. Reason: {self.load_error}"
 
         input_text = f"fix vulnerability: {vulnerable_code}"
         inputs = self.repair_tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512).to(self.device)

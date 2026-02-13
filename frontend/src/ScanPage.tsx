@@ -102,6 +102,7 @@ export default function ScanPage() {
                         const agentResponse = statusRes.agent_response || "";
                         const jsonMatch = agentResponse.match(/```json\n([\s\S]*?)\n```/);
                         if (jsonMatch && jsonMatch[1]) {
+                            console.log("🔍 Raw Score JSON:", jsonMatch[1]); // Debugging
                             try {
                                 const parsed = JSON.parse(jsonMatch[1]);
                                 setScoreData({
