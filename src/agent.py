@@ -38,7 +38,7 @@ async def run_security_scan(target: str) -> str:
                 "alert": a.get('alert'),
                 "risk": risk,
                 "description": a.get('description')[:200], 
-                "other": a.get('other', '')[:300] 
+                "other": a.get('other', '')[:1000] 
             })
             
     return json.dumps(simple_alerts)

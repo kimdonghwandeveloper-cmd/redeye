@@ -72,11 +72,17 @@ class RepoScanner:
                         for i, line in enumerate(lines):
                             for vuln in self.vulnerability_patterns:
                                 if re.search(vuln["pattern"], line):
+                                    # Capture Context (+/- 2 lines)
+                                    start_line = max(0, i - 2)
+                                    end_line = min(len(lines), i + 3)
+                                    context_lines = lines[start_line:end_line]
+                                    context_snippet = "".join(context_lines)
+
                                     alerts.append({
                                         "alert": vuln["label"],
                                         "risk": vuln["risk"],
                                         "description": vuln["description"],
-                                        "other": f"File: {os.path.basename(file)}:{i+1}\nCode: {line.strip()[:100]}"
+                                        "other": f"File: {os.path.basename(file)}:{i+1}\nCode:\n{context_snippet}"[:500] 
                                     })
 
         except Exception as e:
