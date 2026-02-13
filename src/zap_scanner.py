@@ -31,9 +31,12 @@ class ZapScanner:
             
         except Exception as e:
             print(f"⚠️ [ZAP] Connection failed or ZAP not running: {e}")
-            # print("🔄 Switching to MOCK MODE for testing...")
-            
-            # Return empty list instead of fake vulnerability
-            return []
+            # ERROR: Return a system alert so the user knows ZAP failed
+            return [{
+                "alert": "ZAP Scanner Connection Failed",
+                "risk": "High",
+                "description": f"Could not connect to the OWASP ZAP scanning engine at {ZAP_URL}. The scan could not be performed.",
+                "other": f"Technical Error: {str(e)}"
+            }]
 
 zap_scanner = ZapScanner()
