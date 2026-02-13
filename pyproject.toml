@@ -36,6 +36,7 @@ dependencies = [
     "peft",
     "pydantic-settings",
     "certifi",
+    "gitpython>=3.1.46",
 ]
 
 [project.scripts]
