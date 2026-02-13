@@ -50,18 +50,25 @@ class ExpertModel:
                  # Let's stick to CPU for safety, it's small enough (skeleton)
                  pass
             
-            model = model_class(config)
+            if "AutoModel" in model_class.__name__:
+                 model = model_class.from_config(config)
+            else:
+                 model = model_class(config)
             
             # 3. Apply Quantization Structure
             # We must apply the EXACT same quantization as we did during saving
-            torch.quantization.quantize_dynamic(
-                model, {torch.nn.Linear}, dtype=torch.qint8, inplace=True
+            model = torch.quantization.quantize_dynamic(
+                model, {torch.nn.Linear}, dtype=torch.qint8
             )
             
             # 4. Load State Dict
             # We need to find the local path of the pytorch_model.bin
-            from huggingface_hub import hf_hub_download
-            bin_path = hf_hub_download(repo_id=model_name_or_path, filename="pytorch_model.bin", token=settings.HF_TOKEN)
+            import os
+            if os.path.isdir(model_name_or_path):
+                 bin_path = os.path.join(model_name_or_path, "pytorch_model.bin")
+            else:
+                 from huggingface_hub import hf_hub_download
+                 bin_path = hf_hub_download(repo_id=model_name_or_path, filename="pytorch_model.bin", token=settings.HF_TOKEN)
             
             state_dict = torch.load(bin_path, map_location="cpu")
             model.load_state_dict(state_dict)
