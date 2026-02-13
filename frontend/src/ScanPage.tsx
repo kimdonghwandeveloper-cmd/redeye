@@ -35,8 +35,12 @@ export default function ScanPage() {
         const token = queryParams.get('github_token');
         if (token) {
             setGithubToken(token);
-            // Clear URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clear URL (cleanly remove query params)
+            try {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (e) {
+                console.warn("Failed to clean URL:", e);
+            }
             toast({ title: 'GitHub Login Successful', status: 'success' });
         }
     }, [toast]);
