@@ -2,6 +2,7 @@ import os
 import torch
 import shutil
 from transformers import RobertaForSequenceClassification, RobertaTokenizer, AutoModelForSeq2SeqLM, AutoTokenizer
+from peft import PeftModel
 from dotenv import load_dotenv
 
 # Load Env
@@ -38,17 +39,37 @@ def quantize_detection():
         print(f"❌ Error: {e}")
 
 def quantize_repair():
-    print(f"🚀 Loading Repair Model from {REPAIR_MODEL_PATH}...")
+    print(f"🚀 Loading Repair Model (Adapter) from {REPAIR_MODEL_PATH}...")
     try:
-        model = AutoModelForSeq2SeqLM.from_pretrained(REPAIR_MODEL_PATH, token=HF_TOKEN)
-        tokenizer = AutoTokenizer.from_pretrained("t5-small", token=HF_TOKEN) # T5 base tokenizer
-        
+        # 1. Load Base Model (T5-small)
+        # We assume the base model is t5-small as per project specs.
+        # This gives us a clean slate without any "Unexpected key" warnings.
+        print("   - Loading Base Model (t5-small)...")
+        base_model = AutoModelForSeq2SeqLM.from_pretrained("t5-small", token=HF_TOKEN)
+        tokenizer = AutoTokenizer.from_pretrained("t5-small", token=HF_TOKEN)
+
+        # 2. Load Adapter & Merge
+        # Load the adapter from the local path which contains the LoRA weights
+        print(f"   - Loading Adapter and Merging from {REPAIR_MODEL_PATH}...")
+        try:
+             model = PeftModel.from_pretrained(base_model, REPAIR_MODEL_PATH, token=HF_TOKEN)
+             model = model.merge_and_unload()
+             print("   - ✅ Merge Complete! Model is now standard T5.")
+        except Exception as peft_err:
+             print(f"   - ⚠️  Merge Failed: {peft_err}")
+             print("   - Trying fallback: Loading as standard model...")
+             model = AutoModelForSeq2SeqLM.from_pretrained(REPAIR_MODEL_PATH, token=HF_TOKEN)
+
+        # 3. Quantize
         print("📉 Quantizing Repair Model (Dynamic Int8)...")
         quantized_model = torch.quantization.quantize_dynamic(
             model, {torch.nn.Linear}, dtype=torch.qint8
         )
         
         save_path = f"{OUTPUT_DIR}/redeye-repair-quantized"
+        # Clear previous directory to ensure no artifacts like adapter_config.json remain
+        if os.path.exists(save_path):
+            shutil.rmtree(save_path)
         os.makedirs(save_path, exist_ok=True)
         
         print(f"💾 Saving to {save_path}...")
@@ -59,6 +80,8 @@ def quantize_repair():
 
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     if not HF_TOKEN:
