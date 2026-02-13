@@ -274,21 +274,19 @@ export default function ScanPage() {
                                         <Box textAlign="center">
                                             <Text fontSize="lg" fontWeight="bold" mb={2}>Current Risk Score</Text>
                                             <Box w="150px" h="150px" mx="auto">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={getChartData(scoreData.current)}
-                                                            cx="50%" cy="50%"
-                                                            innerRadius={40} outerRadius={60}
-                                                            startAngle={180} endAngle={0}
-                                                            dataKey="value"
-                                                        >
-                                                            {getChartData(scoreData.current).map((_entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                            ))}
-                                                        </Pie>
-                                                    </PieChart>
-                                                </ResponsiveContainer>
+                                                <PieChart width={150} height={150}>
+                                                    <Pie
+                                                        data={getChartData(scoreData.current)}
+                                                        cx="50%" cy="50%"
+                                                        innerRadius={40} outerRadius={60}
+                                                        startAngle={180} endAngle={0}
+                                                        dataKey="value"
+                                                    >
+                                                        {getChartData(scoreData.current).map((_entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                        ))}
+                                                    </Pie>
+                                                </PieChart>
                                             </Box>
                                             <Heading size="xl" mt="-40px" color={scoreData.current >= 80 ? "green.400" : scoreData.current >= 50 ? "orange.400" : "red.400"}>
                                                 {scoreData.current}
@@ -302,21 +300,19 @@ export default function ScanPage() {
                                         <Box textAlign="center">
                                             <Text fontSize="lg" fontWeight="bold" mb={2}>Projected Score (After Fix)</Text>
                                             <Box w="150px" h="150px" mx="auto">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={getChartData(scoreData.projected)}
-                                                            cx="50%" cy="50%"
-                                                            innerRadius={40} outerRadius={60}
-                                                            startAngle={180} endAngle={0}
-                                                            dataKey="value"
-                                                        >
-                                                            {getChartData(scoreData.projected).map((_entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={PROJECTED_COLORS[index % PROJECTED_COLORS.length]} />
-                                                            ))}
-                                                        </Pie>
-                                                    </PieChart>
-                                                </ResponsiveContainer>
+                                                <PieChart width={150} height={150}>
+                                                    <Pie
+                                                        data={getChartData(scoreData.projected)}
+                                                        cx="50%" cy="50%"
+                                                        innerRadius={40} outerRadius={60}
+                                                        startAngle={180} endAngle={0}
+                                                        dataKey="value"
+                                                    >
+                                                        {getChartData(scoreData.projected).map((_entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={PROJECTED_COLORS[index % PROJECTED_COLORS.length]} />
+                                                        ))}
+                                                    </Pie>
+                                                </PieChart>
                                             </Box>
                                             <Heading size="xl" mt="-40px" color="green.400">{scoreData.projected}</Heading>
                                             <Badge colorScheme="green" mt={2}>+ {scoreData.projected - scoreData.current} Improvement</Badge>
