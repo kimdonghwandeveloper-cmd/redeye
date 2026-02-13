@@ -92,15 +92,15 @@ const ModelsPage: React.FC = () => {
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={metrics.history}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                    <XAxis dataKey="step" stroke="#9CA3AF" />
+                                    <XAxis dataKey="step" stroke="#9CA3AF" type="number" domain={['dataMin', 'dataMax']} />
                                     <YAxis stroke="#9CA3AF" />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
                                         itemStyle={{ color: '#E5E7EB' }}
                                     />
                                     <Legend />
-                                    <Line type="monotone" dataKey="loss" stroke="#EF4444" name="Training Loss" dot={false} strokeWidth={2} />
-                                    <Line type="monotone" dataKey="eval_loss" stroke="#3B82F6" name="Validation Loss" strokeWidth={2} />
+                                    <Line type="monotone" dataKey="loss" stroke="#EF4444" name="Training Loss" dot={false} strokeWidth={2} connectNulls={true} />
+                                    <Line type="monotone" dataKey="eval_loss" stroke="#3B82F6" name="Validation Loss" strokeWidth={2} connectNulls={true} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
@@ -118,15 +118,15 @@ const ModelsPage: React.FC = () => {
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={evalHistory}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                    <XAxis dataKey="step" stroke="#9CA3AF" />
+                                    <XAxis dataKey="step" stroke="#9CA3AF" type="number" domain={['dataMin', 'dataMax']} />
                                     <YAxis stroke="#9CA3AF" domain={[0, 1]} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
                                         itemStyle={{ color: '#E5E7EB' }}
                                     />
                                     <Legend />
-                                    <Line type="monotone" dataKey="eval_accuracy" stroke="#10B981" name="Accuracy" strokeWidth={2} />
-                                    <Line type="monotone" dataKey="eval_f1" stroke="#8B5CF6" name="F1 Score" strokeWidth={2} />
+                                    <Line type="monotone" dataKey="eval_accuracy" stroke="#10B981" name="Accuracy" strokeWidth={2} connectNulls={true} />
+                                    <Line type="monotone" dataKey="eval_f1" stroke="#8B5CF6" name="F1 Score" strokeWidth={2} connectNulls={true} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
