@@ -6,7 +6,7 @@ import {
     List, ListItem, ListIcon, useDisclosure
 } from '@chakra-ui/react';
 import { ShieldAlert, BrainCircuit, Play, Loader2, Gauge, Globe, Github, Lock, Unlock } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
