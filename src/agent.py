@@ -2,7 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from src.zap_scanner import zap_scanner
+from src.legacy.zap_scanner import zap_scanner
 from src.expert_model import expert_model
 from src.rag_engine import rag_service
 import json

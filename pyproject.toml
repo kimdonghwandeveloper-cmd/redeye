@@ -38,6 +38,7 @@ dependencies = [
     "certifi",
     "gitpython>=3.1.46",
     "httpx>=0.28.1",
+    "aiohttp>=3.13.3",
 ]
 
 [project.scripts]

@@ -42,8 +42,12 @@ async def get_model_metrics():
     return training_metrics_service.get_metrics()
 
 # Include Routers
+# Include Routers
 from src.auth.github import router as auth_router
+from src.api.analysis import router as analysis_router
+
 app.include_router(auth_router)
+app.include_router(analysis_router)
 
 # Add CORS Middleware
 app.add_middleware(

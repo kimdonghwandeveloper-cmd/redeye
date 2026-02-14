@@ -1,89 +1,130 @@
+from typing import Dict, Optional, Tuple, Any, Union
 from transformers import RobertaForSequenceClassification, RobertaTokenizer, AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
 import torch.nn.functional as F
 from .config import settings
+import logging
+
+# Configure Logging
+logger = logging.getLogger(__name__)
 
 class ExpertModel:
+    """
+    ExpertModel serves as the central AI engine for RedEye.
+    It manages the loading and inference of two specialized models:
+    1. Detection Model (CodeBERT): Classifies code as SAFE or VULNERABLE.
+    2. Repair Model (T5-Small + LoRA): Generates fixes for vulnerable code.
+    
+    Resource Management:
+    - Uses lazy loading to save memory (models are loaded only when requested).
+    - Uses dynamic 8-bit quantization to reduce RAM usage.
+    """
     def __init__(self):
         # Detection Model (CodeBERT)
-        self.detect_model = None
-        self.detect_tokenizer = None
+        self.detect_model: Optional[RobertaForSequenceClassification] = None
+        self.detect_tokenizer: Optional[RobertaTokenizer] = None
         
         # Repair Model (T5-Small + LoRA)
-        self.repair_model = None
-        self.repair_tokenizer = None
+        self.repair_model: Optional[AutoModelForSeq2SeqLM] = None
+        self.repair_tokenizer: Optional[AutoTokenizer] = None
         
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.load_error = None
+        # Hardware Acceleration
+        # IMPORTANT: Dynamic quantization does NOT support CUDA!
+        # Quantized models MUST run on CPU
+        self.device = torch.device("cpu")
+        logger.info(f"🖥️ Using device: {self.device} (Quantized models require CPU)")
+        self.load_error: Optional[str] = None
 
-    def _load_quantized_model(self, model_class, model_name_or_path, is_seq2seq=False):
+    def _load_quantized_model(self, model_class: Any, model_name_or_path: str, is_seq2seq: bool = False) -> Tuple[Any, Any]:
         """
         Helper to load a quantized model (Linear layers quantized to Int8).
+        
         Strategy:
-        1. Load Config & Tokenizer (Normal)
-        2. Initialize Base Model (Float32) on CPU
-        3. Apply Dynamic Quantization Structure (Float32 -> Int8 structure, still empty weights)
-        4. Load Quantized State Dict
+        1. Load Config & Tokenizer (Fast & Lightweight)
+        2. Initialize Base Model Structure (Float32) on CPU without weights
+        3. Apply Dynamic Quantization Structure (Float32 -> Int8 structure)
+        4. Load Quantized State Dict (The actual weights)
         """
         try:
-            print(f"🚀 Loading Quantized Model from {model_name_or_path}...")
+            print(f"[DEBUG] Step 1: Starting to load model from: {model_name_or_path}")
+            logger.info(f"🚀 Loading Quantized Model from {model_name_or_path}...")
+            logger.debug(f"HF_TOKEN set: {bool(settings.HF_TOKEN)}")
             
-            # 1. Download/Cache model if it's a Repo ID
-            # We use the tokenizer loading to ensure the folder is cached or use snapshot_download
-            # But simpler: use from_pretrained to get config, then init model
+            # Prepare token (None if empty string)
+            hf_token = settings.HF_TOKEN if settings.HF_TOKEN else None
+            print(f"[DEBUG] Step 2: Token prepared, HF_TOKEN exists: {bool(hf_token)}")
             
-            # Load Config
+            # 1. Load Config
             from transformers import AutoConfig
-            config = AutoConfig.from_pretrained(model_name_or_path, token=settings.HF_TOKEN)
+            print(f"[DEBUG] Step 3: Loading config from {model_name_or_path}")
+            config = AutoConfig.from_pretrained(model_name_or_path, token=hf_token)
+            print(f"[DEBUG] Step 4: Config loaded successfully")
             
-            # Load Tokenizer
+            # 2. Load Tokenizer
+            print(f"[DEBUG] Step 5: Loading tokenizer, is_seq2seq={is_seq2seq}")
             if is_seq2seq:
-                tokenizer = AutoTokenizer.from_pretrained("t5-small", token=settings.HF_TOKEN) 
+                tokenizer = AutoTokenizer.from_pretrained("t5-small", token=hf_token) 
             else:
-                tokenizer = RobertaTokenizer.from_pretrained(model_name_or_path, token=settings.HF_TOKEN)
+                # Use microsoft/codebert-base tokenizer (stable, well-tested)
+                # The custom tokenizer.json in the repo is corrupted
+                print(f"[DEBUG] Step 5.5: Using microsoft/codebert-base tokenizer")
+                tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base", token=hf_token, use_fast=True)
+            print(f"[DEBUG] Step 6: Tokenizer loaded")
 
-            # 2. Init Base Model (Empty/Random weights)
-            # This is lightweight because we don't load the full float32 weights from hub, just init structure
-            # Note: We can't use from_pretrained because it tries to load weights. We use from_config.
+            # 3. Init Base Model (Empty/Random weights)
+            # This is lightweight because we don't load the full float32 weights from hub.
+            print(f"[DEBUG] Step 7: Initializing base model structure")
             with torch.device("meta"):
-                 # Meta device avoids allocating memory for initial weights, but quantize_dynamic might need real CPU tensors
-                 # Let's stick to CPU for safety, it's small enough (skeleton)
-                 pass
+                 pass # Meta device optimization (skip for now to ensure compatibility)
             
             if "AutoModel" in model_class.__name__:
                  model = model_class.from_config(config)
             else:
                  model = model_class(config)
+            print(f"[DEBUG] Step 8: Base model initialized")
             
-            # 3. Apply Quantization Structure
+            # 4. Apply Quantization Structure
             # We must apply the EXACT same quantization as we did during saving
+            print(f"[DEBUG] Step 9: Applying quantization")
             model = torch.quantization.quantize_dynamic(
                 model, {torch.nn.Linear}, dtype=torch.qint8
             )
+            print(f"[DEBUG] Step 10: Quantization applied")
             
-            # 4. Load State Dict
-            # We need to find the local path of the pytorch_model.bin
+            # 5. Load State Dict
             import os
+            print(f"[DEBUG] Step 11: Checking if path is directory: {os.path.isdir(model_name_or_path)}")
             if os.path.isdir(model_name_or_path):
                  bin_path = os.path.join(model_name_or_path, "pytorch_model.bin")
+                 print(f"[DEBUG] Step 12a: Using local path: {bin_path}")
             else:
                  from huggingface_hub import hf_hub_download
-                 bin_path = hf_hub_download(repo_id=model_name_or_path, filename="pytorch_model.bin", token=settings.HF_TOKEN)
+                 print(f"[DEBUG] Step 12b: Downloading from HuggingFace: {model_name_or_path}")
+                 logger.info(f"📥 Downloading from HuggingFace: {model_name_or_path}")
+                 bin_path = hf_hub_download(
+                     repo_id=model_name_or_path, 
+                     filename="pytorch_model.bin", 
+                     token=hf_token
+                 )
+                 print(f"[DEBUG] Step 13: Downloaded to: {bin_path}")
             
+            print(f"[DEBUG] Step 14: Loading weights from: {bin_path}")
+            logger.info(f"📂 Loading weights from: {bin_path}")
             state_dict = torch.load(bin_path, map_location="cpu")
+            print(f"[DEBUG] Step 15: Weights loaded, loading into model")
             model.load_state_dict(state_dict)
             
             model.to(self.device)
             model.eval()
-            print(f"✅ Quantized Model Loaded: {model_name_or_path}")
+            logger.info(f"✅ Quantized Model Loaded: {model_name_or_path}")
             return model, tokenizer
 
         except Exception as e:
-            print(f"❌ Failed to load Quantized Model {model_name_or_path}: {e}")
+            logger.error(f"❌ Failed to load Quantized Model {model_name_or_path}: {e}")
             raise e
 
     def load_detection_model(self):
-        """Load the detection model (Quantized)."""
+        """Lazy load the detection model (Quantized)."""
         if self.detect_model and self.detect_tokenizer:
             return 
 
@@ -93,11 +134,11 @@ class ExpertModel:
                 settings.DETECTION_MODEL_PATH
             )
         except Exception as e:
-             self.load_error = f"Detection: {str(e)}"
+             self.load_error = f"Detection Model Error: {str(e)}"
              self.detect_model = None
 
     def load_repair_model(self):
-        """Load the repair model (Quantized)."""
+        """Lazy load the repair model (Quantized)."""
         if self.repair_model and self.repair_tokenizer:
             return 
 
@@ -108,12 +149,23 @@ class ExpertModel:
                 is_seq2seq=True
             )
         except Exception as e:
-            self.load_error = f"Repair: {str(e)}"
+            self.load_error = f"Repair Model Error: {str(e)}"
             self.repair_model = None
 
-    def verify(self, code_snippet: str) -> dict:
+    def verify(self, code_snippet: str) -> Dict[str, Union[str, float]]:
         """
-        Verify if code is SAFE or VULNERABLE.
+        [API Endpoint Helper]
+        Analyzes a code snippet to detect security vulnerabilities.
+
+        Args:
+            code_snippet (str): The source code to analyze.
+
+        Returns:
+            dict: {
+                "label": "SAFE" | "VULNERABLE" | "ERROR",
+                "confidence": float (0.0 - 1.0),
+                "error": str (optional)
+            }
         """
         # Lazy Load
         if not self.detect_model or not self.detect_tokenizer:
@@ -123,8 +175,15 @@ class ExpertModel:
             return {"label": "ERROR", "confidence": 0.0, "error": f"Model load failed: {self.load_error}"}
 
         try:
-            inputs = self.detect_tokenizer(code_snippet, return_tensors="pt", truncation=True, max_length=512).to(self.device)
+            # Tokenize & Move to Device
+            inputs = self.detect_tokenizer(
+                code_snippet, 
+                return_tensors="pt", 
+                truncation=True, 
+                max_length=512
+            ).to(self.device)
             
+            # Inference
             with torch.no_grad():
                 logits = self.detect_model(**inputs).logits
                 probs = F.softmax(logits, dim=-1)
@@ -135,25 +194,41 @@ class ExpertModel:
             
             return {
                 "label": label,
-                "confidence": confidence
+                "confidence": round(confidence, 4)
             }
         except Exception as e:
+            logger.error(f"Inference failed: {e}")
             return {"label": "ERROR", "confidence": 0.0, "error": f"Inference failed: {str(e)}"}
 
-    def repair(self, vulnerable_code: str) -> str:
+    def repair(self, vulnerable_code: str) -> Dict[str, str]:
         """
-        Generate a fix for vulnerable code.
+        [API Endpoint Helper]
+        Generates a secure fix for the provided vulnerable code.
+
+        Args:
+            vulnerable_code (str): The code that needs fixing.
+
+        Returns:
+            dict: {
+                "fixed_code": str,
+                "error": str (optional)
+            }
         """
         # Lazy Load
         if not self.repair_model or not self.repair_tokenizer:
             self.load_repair_model()
             
         if not self.repair_model or not self.repair_tokenizer:
-            return f"Error: Repair model not loaded. Reason: {self.load_error}"
+            return {"fixed_code": "", "error": f"Model load failed: {self.load_error}"}
 
         try:
             input_text = f"fix vulnerability: {vulnerable_code}"
-            inputs = self.repair_tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512).to(self.device)
+            inputs = self.repair_tokenizer(
+                input_text, 
+                return_tensors="pt", 
+                truncation=True, 
+                max_length=512
+            ).to(self.device)
 
             with torch.no_grad():
                 outputs = self.repair_model.generate(
@@ -166,8 +241,10 @@ class ExpertModel:
                 )
             
             fix = self.repair_tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return fix
+            return {"fixed_code": fix}
+            
         except Exception as e:
-            return f"Error during generation: {str(e)}"
+            logger.error(f"Generation failed: {e}")
+            return {"fixed_code": "", "error": f"Generation failed: {str(e)}"}
 
 expert_model = ExpertModel()

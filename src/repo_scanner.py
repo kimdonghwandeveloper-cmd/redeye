@@ -3,8 +3,15 @@ import shutil
 import tempfile
 import re
 from git import Repo
+from typing import List, Dict, Any
 
 class RepoScanner:
+    """
+    RepoScanner handles Static Application Security Testing (SAST) using pattern matching.
+    It can scan:
+    1. GitHub Repositories (via `scan_repo`) - Clones and scans all files.
+    2. Raw Code Content (via `scan_content`) - Scans a single code snippet (API use).
+    """
     def __init__(self):
         self.vulnerability_patterns = [
             # 1. Hardcoded Secrets (AWS, Generic API Keys)
@@ -44,9 +51,35 @@ class RepoScanner:
             }
         ]
 
-    def scan_repo(self, repo_url: str) -> list:
+    def scan_content(self, content: str, filename: str = "snippet") -> List[Dict[str, Any]]:
+        """
+        Scans a single string of code for vulnerabilities.
+        Useful for API endpoints where code is sent directly.
+        """
+        alerts = []
+        lines = content.split('\n')
+        
+        for i, line in enumerate(lines):
+            for vuln in self.vulnerability_patterns:
+                if re.search(vuln["pattern"], line):
+                    # Capture Context (+/- 2 lines)
+                    start_line = max(0, i - 2)
+                    end_line = min(len(lines), i + 3)
+                    context_lines = lines[start_line:end_line]
+                    context_snippet = "\n".join(context_lines)
+
+                    alerts.append({
+                        "alert": vuln["label"],
+                        "risk": vuln["risk"],
+                        "description": vuln["description"],
+                        "other": f"File: {filename}:{i+1}\nCode:\n{context_snippet}"[:500] 
+                    })
+        return alerts
+
+    def scan_repo(self, repo_url: str) -> List[Dict[str, Any]]:
         """
         Clones the repo to a temp dir, scans files, and returns alerts.
+        Legacy method: In RedEye 3.0, n8n handles cloning. This is kept for backward compatibility.
         """
         print(f"🔍 [SAST] Cloning {repo_url}...")
         temp_dir = tempfile.mkdtemp()
@@ -67,23 +100,14 @@ class RepoScanner:
                     if not self._is_code_file(file):
                         continue
                         
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        lines = f.readlines()
-                        for i, line in enumerate(lines):
-                            for vuln in self.vulnerability_patterns:
-                                if re.search(vuln["pattern"], line):
-                                    # Capture Context (+/- 2 lines)
-                                    start_line = max(0, i - 2)
-                                    end_line = min(len(lines), i + 3)
-                                    context_lines = lines[start_line:end_line]
-                                    context_snippet = "".join(context_lines)
-
-                                    alerts.append({
-                                        "alert": vuln["label"],
-                                        "risk": vuln["risk"],
-                                        "description": vuln["description"],
-                                        "other": f"File: {os.path.basename(file)}:{i+1}\nCode:\n{context_snippet}"[:500] 
-                                    })
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            # Use the shared scanning logic
+                            file_alerts = self.scan_content(content, filename=file)
+                            alerts.extend(file_alerts)
+                    except Exception as read_err:
+                        print(f"⚠️ Failed to read {file}: {read_err}")
 
         except Exception as e:
             print(f"❌ [SAST] Failed to scan repo: {e}")

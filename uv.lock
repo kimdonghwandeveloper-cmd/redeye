@@ -2412,6 +2412,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
+    { name = "aiohttp" },
     { name = "certifi" },
     { name = "datasets" },
     { name = "evaluate" },
@@ -2447,6 +2448,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate" },
+    { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "certifi" },
     { name = "datasets" },
     { name = "evaluate" },

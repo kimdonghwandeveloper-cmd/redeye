@@ -25,3 +25,9 @@ adapter_model.bin
 __pycache__/
 .pytest_cache/
 quantized_models/
+
+# Test and Debug Files
+test_*.py
+debug_*.py
+diagnose_*.py
+inspect_*.py
