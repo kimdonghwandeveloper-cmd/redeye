@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 // Backend URL (Environment Variable or Default)
-// Backend URL (Environment Variable or Default)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const api = axios.create({
@@ -46,7 +45,7 @@ export const getModelMetrics = async () => {
     return response.data;
 };
 
-// --- GitHub Integration API ---
+// --- GitHub Integration API (Session-based) ---
 export interface GitHubRepo {
     id: number;
     name: string;
@@ -57,9 +56,33 @@ export interface GitHubRepo {
     language?: string;
 }
 
-export const getUserRepos = async (token: string): Promise<GitHubRepo[]> => {
+export interface GitHubUser {
+    github_user: string;
+    github_id: number;
+    avatar_url?: string;
+    session_id: string;
+}
+
+// 현재 로그인된 유저 정보 조회
+export const getCurrentUser = async (sessionId: string): Promise<GitHubUser> => {
+    const response = await api.get<GitHubUser>("/auth/me", {
+        params: { session_id: sessionId },
+    });
+    return response.data;
+};
+
+// 유저 리포지토리 목록 (session_id 기반)
+export const getUserRepos = async (sessionId: string): Promise<GitHubRepo[]> => {
     const response = await api.get<GitHubRepo[]>("/user/repos", {
-        params: { token },
+        params: { session_id: sessionId },
+    });
+    return response.data;
+};
+
+// 로그아웃
+export const logout = async (sessionId: string) => {
+    const response = await api.post("/auth/logout", null, {
+        params: { session_id: sessionId },
     });
     return response.data;
 };
@@ -68,3 +91,4 @@ export const getScanStatus = async (scanId: string): Promise<ScanResponse> => {
     const response = await api.get<ScanResponse>(`/scan/${scanId}`);
     return response.data;
 };
+

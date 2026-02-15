@@ -10,7 +10,7 @@ import { PieChart, Pie, Cell } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
-import { startScan, getScanStatus, getUserRepos, type ScanResponse, type GitHubRepo } from './api';
+import { startScan, getScanStatus, getUserRepos, getCurrentUser, logout, type ScanResponse, type GitHubRepo, type GitHubUser } from './api';
 
 
 
@@ -23,25 +23,43 @@ export default function ScanPage() {
     const [scoreData, setScoreData] = useState<{ current: number; projected: number } | null>(null);
 
     // GitHub Integration State
-    const [githubToken, setGithubToken] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
     const [repos, setRepos] = useState<GitHubRepo[]>([]);
     const { isOpen, onOpen, onClose } = useDisclosure();
 
     const toast = useToast();
 
-    // Check for GitHub Token on Mount
+    // Check for session_id on Mount (from URL or localStorage)
     useEffect(() => {
         const queryParams = new URLSearchParams(window.location.search);
-        const token = queryParams.get('github_token');
-        if (token) {
-            setGithubToken(token);
-            // Clear URL (cleanly remove query params)
+        const sid = queryParams.get('session_id');
+        const storedSid = localStorage.getItem('redeye_session_id');
+
+        const activeSessionId = sid || storedSid;
+
+        if (activeSessionId) {
+            setSessionId(activeSessionId);
+            localStorage.setItem('redeye_session_id', activeSessionId);
+
+            // Clear URL
             try {
                 window.history.replaceState({}, document.title, window.location.pathname);
             } catch (e) {
                 console.warn("Failed to clean URL:", e);
             }
-            toast({ title: 'GitHub Login Successful', status: 'success' });
+
+            // Fetch user info
+            getCurrentUser(activeSessionId)
+                .then(user => {
+                    setGithubUser(user);
+                    toast({ title: `Welcome, ${user.github_user}!`, status: 'success' });
+                })
+                .catch(() => {
+                    // Session expired
+                    localStorage.removeItem('redeye_session_id');
+                    setSessionId(null);
+                });
         }
     }, [toast]);
 
@@ -53,14 +71,24 @@ export default function ScanPage() {
     };
 
     const handleFetchRepos = async () => {
-        if (!githubToken) return;
+        if (!sessionId) return;
         try {
-            const userRepos = await getUserRepos(githubToken);
+            const userRepos = await getUserRepos(sessionId);
             setRepos(userRepos);
             onOpen();
         } catch (error) {
             toast({ title: 'Failed to fetch repos', description: String(error), status: 'error' });
         }
+    };
+
+    const handleLogout = async () => {
+        if (sessionId) {
+            try { await logout(sessionId); } catch (e) { console.warn(e); }
+        }
+        localStorage.removeItem('redeye_session_id');
+        setSessionId(null);
+        setGithubUser(null);
+        toast({ title: 'Logged out', status: 'info' });
     };
 
     const handleSelectRepo = (repoUrl: string) => {
@@ -192,7 +220,7 @@ export default function ScanPage() {
 
                             {/* GitHub Integration Buttons */}
                             <Flex gap={4} width="full">
-                                {!githubToken ? (
+                                {!sessionId ? (
                                     <Button
                                         leftIcon={<Github size={20} />}
                                         size="md"
@@ -205,16 +233,26 @@ export default function ScanPage() {
                                         Login with GitHub
                                     </Button>
                                 ) : (
-                                    <Button
-                                        leftIcon={<Github size={20} />}
-                                        size="md"
-                                        width="full"
-                                        colorScheme="gray"
-                                        variant="outline"
-                                        onClick={handleFetchRepos}
-                                    >
-                                        Select from GitHub
-                                    </Button>
+                                    <>
+                                        <Button
+                                            leftIcon={<Github size={20} />}
+                                            size="md"
+                                            flex="1"
+                                            colorScheme="gray"
+                                            variant="outline"
+                                            onClick={handleFetchRepos}
+                                        >
+                                            {githubUser ? `${githubUser.github_user}'s Repos` : 'Select from GitHub'}
+                                        </Button>
+                                        <Button
+                                            size="md"
+                                            colorScheme="red"
+                                            variant="ghost"
+                                            onClick={handleLogout}
+                                        >
+                                            Logout
+                                        </Button>
+                                    </>
                                 )}
                             </Flex>
                         </VStack>
