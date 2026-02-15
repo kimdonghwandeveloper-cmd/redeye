@@ -18,16 +18,22 @@ dist/
 .DS_Store
 
 # Large Model Files
-redeye-detection-model/
-redeye-repair-model/
-*.safetensors
-adapter_model.bin
-__pycache__/
-.pytest_cache/
+redeye-detection-model*/
+redeye-repair-model*/
 quantized_models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+checkpoint-*/
+logs/
 
 # Test and Debug Files
 test_*.py
 debug_*.py
 diagnose_*.py
 inspect_*.py
+
+# Git에 추가하지 않을 데이터 폴더
+data\circl_processed\repair.jsonl
+data/circl_processed/detection.jsonl

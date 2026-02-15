@@ -1,73 +1,93 @@
 import os
 import torch
 import shutil
-from transformers import RobertaForSequenceClassification, RobertaTokenizer, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import (
+    RobertaForSequenceClassification, 
+    RobertaTokenizer, 
+    AutoModelForSeq2SeqLM, 
+    AutoTokenizer,
+    T5Tokenizer
+)
 from peft import PeftModel
 from dotenv import load_dotenv
 
 # Load Env
 load_dotenv()
 
-# Config (Should match your .env or paths)
-DETECTION_MODEL_PATH = os.getenv("DETECTION_MODEL_PATH", "./redeye-detection-model")
-REPAIR_MODEL_PATH = os.getenv("REPAIR_MODEL_PATH", "./redeye-repair-model")
+# Config (Force Local Paths for safety)
+DETECTION_LOCAL = "./redeye-detection-model-v2"
+REPAIR_LOCAL = "./redeye-repair-model-v4"
 HF_TOKEN = os.getenv("HF_TOKEN")
-
 OUTPUT_DIR = "./quantized_models"
 
 def quantize_detection():
-    print(f"🚀 Loading Detection Model from {DETECTION_MODEL_PATH}...")
+    print(f"\n🚀 [Detection Model] Loading from {DETECTION_LOCAL}...")
     try:
-        model = RobertaForSequenceClassification.from_pretrained(DETECTION_MODEL_PATH, token=HF_TOKEN)
-        tokenizer = RobertaTokenizer.from_pretrained(DETECTION_MODEL_PATH, token=HF_TOKEN)
+        # 1. Load Model
+        model = RobertaForSequenceClassification.from_pretrained(DETECTION_LOCAL, token=HF_TOKEN)
         
-        print("📉 Quantizing Detection Model (Dynamic Int8)...")
+        # 2. Load Tokenizer (Robust fallback to base model name)
+        print("   - Loading Tokenizer...")
+        try:
+            # Try loading from local first
+            tokenizer = RobertaTokenizer.from_pretrained(DETECTION_LOCAL, token=HF_TOKEN)
+        except Exception:
+            print("   - ⚠️ Local tokenizer load failed, falling back to 'microsoft/codebert-base'")
+            tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base", token=HF_TOKEN)
+        
+        # 3. Quantize
+        print("📉 Quantizing (Dynamic Int8)...")
         quantized_model = torch.quantization.quantize_dynamic(
             model, {torch.nn.Linear}, dtype=torch.qint8
         )
         
-        save_path = f"{OUTPUT_DIR}/redeye-detection-quantized"
+        save_path = f"{OUTPUT_DIR}/redeye-detection-quantized-v2"
         os.makedirs(save_path, exist_ok=True)
         
         print(f"💾 Saving to {save_path}...")
         torch.save(quantized_model.state_dict(), f"{save_path}/pytorch_model.bin")
-        model.config.save_pretrained(save_path) # Save config
-        tokenizer.save_pretrained(save_path)    # Save tokenizer
+        model.config.save_pretrained(save_path)
+        tokenizer.save_pretrained(save_path)
         print("✅ Detection Model Quantized & Saved!")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Detection Error: {e}")
 
 def quantize_repair():
-    print(f"🚀 Loading Repair Model (Adapter) from {REPAIR_MODEL_PATH}...")
+    print(f"\n🚀 [Repair Model] Loading Adapter from {REPAIR_LOCAL}...")
     try:
-        # 1. Load Base Model (T5-small)
-        # We assume the base model is t5-small as per project specs.
-        # This gives us a clean slate without any "Unexpected key" warnings.
-        print("   - Loading Base Model (t5-small)...")
-        base_model = AutoModelForSeq2SeqLM.from_pretrained("t5-small", token=HF_TOKEN)
-        tokenizer = AutoTokenizer.from_pretrained("t5-small", token=HF_TOKEN)
-
-        # 2. Load Adapter & Merge
-        # Load the adapter from the local path which contains the LoRA weights
-        print(f"   - Loading Adapter and Merging from {REPAIR_MODEL_PATH}...")
+        # 1. Load Base Model (CodeT5-small)
+        print("   - Loading Base Model (Salesforce/codet5-small)...")
+        base_model = AutoModelForSeq2SeqLM.from_pretrained("Salesforce/codet5-small", token=HF_TOKEN)
+        
+        # 2. Load Tokenizer (Multiple fallbacks for TypeErrors/SentencePiece issues)
+        print("   - Loading Tokenizer...")
+        tokenizer = None
         try:
-             model = PeftModel.from_pretrained(base_model, REPAIR_MODEL_PATH, token=HF_TOKEN)
-             model = model.merge_and_unload()
-             print("   - ✅ Merge Complete! Model is now standard T5.")
-        except Exception as peft_err:
-             print(f"   - ⚠️  Merge Failed: {peft_err}")
-             print("   - Trying fallback: Loading as standard model...")
-             model = AutoModelForSeq2SeqLM.from_pretrained(REPAIR_MODEL_PATH, token=HF_TOKEN)
+            # Try RobertaTokenizer directly (CodeT5 uses this)
+            tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small", token=HF_TOKEN)
+        except Exception:
+            try:
+                # Try AutoTokenizer with fast disabled
+                tokenizer = AutoTokenizer.from_pretrained("Salesforce/codet5-small", token=HF_TOKEN, use_fast=False)
+            except Exception:
+                # Global fallback to t5-small if all else fails
+                print("   - ⚠️ CodeT5 tokenizer failed, using 't5-small' fallback")
+                tokenizer = T5Tokenizer.from_pretrained("t5-small", token=HF_TOKEN)
 
-        # 3. Quantize
-        print("📉 Quantizing Repair Model (Dynamic Int8)...")
+        # 3. Load Adapter & Merge
+        print(f"   - Merging Adaptor weights...")
+        model = PeftModel.from_pretrained(base_model, REPAIR_LOCAL, token=HF_TOKEN)
+        model = model.merge_and_unload()
+        print("   - ✅ Merge Complete!")
+
+        # 4. Quantize
+        print("📉 Quantizing (Dynamic Int8)...")
         quantized_model = torch.quantization.quantize_dynamic(
             model, {torch.nn.Linear}, dtype=torch.qint8
         )
         
-        save_path = f"{OUTPUT_DIR}/redeye-repair-quantized"
-        # Clear previous directory to ensure no artifacts like adapter_config.json remain
+        save_path = f"{OUTPUT_DIR}/redeye-repair-quantized-v2"
         if os.path.exists(save_path):
             shutil.rmtree(save_path)
         os.makedirs(save_path, exist_ok=True)
@@ -79,14 +99,12 @@ def quantize_repair():
         print("✅ Repair Model Quantized & Saved!")
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Repair Error: {e}")
         import traceback
         traceback.print_exc()
 
 if __name__ == "__main__":
-    if not HF_TOKEN:
-        print("⚠️ Warning: HF_TOKEN not found in env. Private models might fail.")
-    
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     quantize_detection()
     quantize_repair()
-    print("\n✨ All Done. Now you can upload the 'quantized_models' folder to Hugging Face.")
+    print("\n✨ All Done. Now you can use upload_models.py to upload the 'quantized_models' folder.")
