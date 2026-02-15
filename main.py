@@ -89,7 +89,22 @@ async def background_scan_task(scan_id: str, target_url: str, language: str = "e
         })
         agent_output = result["output"]
 
-        # 2. Update DB as Completed
+        # 2. Extract Training Data (Simplified approach: Look for code blocks)
+        # This is high-level; ideally, use structured output.
+        try:
+             import re
+             code_blocks = re.findall(r"```(?:\w+)?\n([\s\S]+?)\n```", agent_output)
+             if len(code_blocks) >= 2:
+                  # Assume first is vulnerable, second is fixed (common pattern)
+                  await db.save_training_data(
+                       vulnerable_code=code_blocks[0],
+                       fixed_code=code_blocks[1],
+                       vulnerability_type="agent_generated_fix"
+                  )
+        except Exception as data_err:
+             print(f"⚠️ Failed to extract training data: {data_err}")
+
+        # 3. Update DB as Completed
         if db.db is not None:
              await db.update_scan(scan_id, "completed", agent_output)
              print(f"✅ [Worker] Scan completed for {scan_id}")

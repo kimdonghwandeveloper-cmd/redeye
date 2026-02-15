@@ -115,4 +115,22 @@ class Database:
         await cls.db["sessions"].delete_one({"session_id": session_id})
         print(f"🗑️ Session deleted: {session_id[:8]}...")
 
+    # --- Training Data Collection ---
+    @classmethod
+    async def save_training_data(cls, vulnerable_code: str, fixed_code: str, vulnerability_type: str = "general"):
+        """
+        에이전트가 생성한 (취약 코드, 수정 코드) 쌍을 지속적 학습을 위해 저장.
+        """
+        if cls.db is None:
+            return
+            
+        data = {
+            "vulnerable_code": vulnerable_code,
+            "fixed_code": fixed_code,
+            "vulnerability_type": vulnerability_type,
+            "created_at": datetime.utcnow()
+        }
+        await cls.db["training_data"].insert_one(data)
+        print(f"📥 Saved training data pair for type: {vulnerability_type}")
+
 db = Database()
