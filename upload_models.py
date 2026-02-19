@@ -6,25 +6,40 @@ def upload_models():
     print("🚀 RedEye Model Uploader")
     print("This script will upload your local models to Hugging Face.")
     
-    # 1. Login
-    token = input("Enter your Hugging Face Write Token (get it from https://huggingface.co/settings/tokens): ").strip()
-    if not token:
-        print("❌ Token is required.")
-        return
+    # 1. Login Logic
+    # Use HF_TOKEN env var if available, otherwise try to load from local cache
+    token = os.getenv("HF_TOKEN")
+    if token:
+        print("🔑 Using HF_TOKEN from environment variable.")
+        login(token=token)
+    else:
+        print("ℹ️ No HF_TOKEN env var found. Trying to use local credentials...")
+        # HfApi() will automatically use stored token if available
 
     try:
-        login(token=token)
         api = HfApi()
         user_info = api.whoami(token=token)
         username = user_info['name']
         print(f"✅ Logged in as: {username}")
     except Exception as e:
         print(f"❌ Login failed: {e}")
+        print("👉 Please run 'huggingface-cli login' in your terminal or set HF_TOKEN environment variable.")
         return
 
     # 2. Define Models to Upload
-    # 2. Define Models to Upload
     models = [
+        # Full Models
+        {
+            "local_path": "./redeye-detection-model-v2",
+            "repo_name": "redeye-detection-model-v2",
+            "type": "model"
+        },
+        {
+            "local_path": "./redeye-repair-model-v4",
+            "repo_name": "redeye-repair-model-v4",
+            "type": "model"
+        },
+        # Quantized Models
         {
             "local_path": "./quantized_models/redeye-detection-quantized-v2",
             "repo_name": "redeye-detection-quantized-v2",
@@ -63,9 +78,13 @@ def upload_models():
         except Exception as e:
             print(f"❌ Failed to upload {repo_id}: {e}")
 
-    print("\n🎉 All done! Now update your Railway variables with these Repo IDs.")
-    print(f"1. DETECTION_MODEL_PATH = {username}/redeye-detection-v2")
-    print(f"2. REPAIR_MODEL_PATH = {username}/redeye-repair-v2")
+    print("\n🎉 All done! Now update your REDEYE backend config.")
+    print(f"Originals:")
+    print(f"  DETECTION_MODEL = {username}/redeye-detection-model-v2")
+    print(f"  REPAIR_MODEL = {username}/redeye-repair-model-v4")
+    print(f"Quantized (for Production):")
+    print(f"  DETECTION_MODEL_QUANTIZED = {username}/redeye-detection-quantized-v2")
+    print(f"  REPAIR_MODEL_QUANTIZED = {username}/redeye-repair-quantized-v2")
 
 if __name__ == "__main__":
     upload_models()
