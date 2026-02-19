@@ -65,6 +65,44 @@ def parse_diff_for_detection(diff_text: str, language: str) -> list:
     safe_lines = []
     
     for line in diff_text.split('\n'):
+        # 메타데이터 라인 무시 (index, mode 등)
+        if line.startswith('index ') or line.startswith('old mode ') or line.startswith('new mode ') or line.startswith('similarity index') or line.startswith('deleted file mode') or line.startswith('new file mode'):
+            continue
+
+        # 파일 경계 또는 diff 헤더 발견 시 컨텍스트 리셋
+        if line.startswith('diff --git') or line.startswith('--- a/') or line.startswith('+++ b/'):
+             # 이전 hunk 처리 (있다면)
+            if vuln_lines or safe_lines:
+                context = '\n'.join(current_hunk_context[-MAX_CONTEXT_LINES:])
+                
+                if vuln_lines:
+                    vuln_code = '\n'.join(vuln_lines)
+                    if MIN_CODE_LENGTH <= len(vuln_code) <= MAX_CODE_LENGTH:
+                        full_code = f"{context}\n{vuln_code}" if context else vuln_code
+                        samples.append({
+                            "code": full_code.strip(),
+                            "label": 1,
+                            "language": language
+                        })
+                
+                if safe_lines:
+                    safe_code = '\n'.join(safe_lines)
+                    if MIN_CODE_LENGTH <= len(safe_code) <= MAX_CODE_LENGTH:
+                        full_code = f"{context}\n{safe_code}" if context else safe_code
+                        samples.append({
+                            "code": full_code.strip(),
+                            "label": 0,
+                            "language": language
+                        })
+
+            # 리셋 (단, --- / +++ 는 같은 파일 내 hunk가 아님. diff --git으로만 파일 구분)
+            # 보통 ---/+++는 diff --git 뒤에 나오지만, 확실히 하기 위해 diff --git에서만 리셋하도록 수정
+            if line.startswith('diff --git'):
+                current_hunk_context = []
+                vuln_lines = []
+                safe_lines = []
+            continue
+
         if line.startswith('@@'):
             # 이전 hunk 처리
             if vuln_lines or safe_lines:
@@ -94,8 +132,6 @@ def parse_diff_for_detection(diff_text: str, language: str) -> list:
             vuln_lines = []
             safe_lines = []
             
-        elif line.startswith('---') or line.startswith('+++'):
-            continue
         elif line.startswith('-'):
             vuln_lines.append(line[1:])
         elif line.startswith('+'):
