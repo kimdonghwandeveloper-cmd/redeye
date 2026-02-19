@@ -23,7 +23,7 @@ class RepoScanner:
             },
             # 2. SQL Injection (Broader Pattern)
             {
-                "pattern": r"(?i)(SELECT|INSERT|UPDATE|DELETE).*['\"]\s*\+\s*[a-zA-Z_][a-zA-Z0-9_]*",
+                "pattern": r"(?i)\b(SELECT|INSERT|UPDATE|DELETE)\b.*['\"]\s*\+\s*[a-zA-Z_][a-zA-Z0-9_]*",
                 "label": "SQL Injection",
                 "risk": "High",
                 "description": "Potential SQL Injection via string concatenation detected."
